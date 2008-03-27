@@ -70,15 +70,13 @@ static char* default_file = "nytprof.out";
 static FILE* out;
 static FILE* in;
 static pid_t last_pid;
-static unsigned int bufsiz = BUFSIZ;
-static char* out_buffer;
 static bool forkok = 0;
 static bool usecputime = 0;
-static bool profile_blocks = 1;
+static bool profile_blocks = 0;
 
 /* options and overrides */
-static char PROF_output_file[255];
-static char READER_input_file[255];
+static char PROF_output_file[MAXPATHLEN+1];
+static char READER_input_file[MAXPATHLEN+1];
 static bool PROF_use_stdout = 0;
 static bool READER_use_stdin = 0;
 static int trace_level = 0;
@@ -248,6 +246,7 @@ hash_op (Hash_entry entry, Hash_entry** retval, bool insert) {
 unsigned int
 get_file_id(char* file_name, STRLEN file_name_len) {
 
+	dTHX;
 	Hash_entry entry, *found;
 
   /* AutoLoader adds some information to Perl's internal file name that we have
@@ -270,9 +269,8 @@ get_file_id(char* file_name, STRLEN file_name_len) {
 		if ('(' == file_name[0] && ']' == file_name[file_name_len-1]) {
 			char *start = strchr(file_name, '[');
 			char *colon = ":";
-			//char *end   = rninstr(file_name, file_name+file_name_len-1, colon, 
-			//											colon+1);
-			char* end = strchr(file_name + file_name_len, ':');
+			/* can't use strchr here (not nul terminated) so use rninstr */
+			char *end = rninstr(file_name, file_name+file_name_len-1, colon, colon+1);
 
 			if (!start || !end || start > end) {
 				warn("Unsupported filename syntax '%s'", file_name);
@@ -624,10 +622,10 @@ set_option(const char* option) {
 		if (trace_level) warn("# Using standard out for output.\n");
 		PROF_use_stdout = 1;
 	} else if(0 == strncmp(option, "in=", 3)) {
-		strncpy(READER_input_file, &option[3], 500);
+		strncpy(READER_input_file, &option[3], MAXPATHLEN);
 		if (trace_level) warn("# Using  %s for input.\n", READER_input_file);
 	} else if(0 == strncmp(option, "out=", 4)) {
-		strncpy(PROF_output_file, &option[4], 500);
+		strncpy(PROF_output_file, &option[4], MAXPATHLEN);
 		if (trace_level) warn("# Using %s for output.\n", PROF_output_file);
 	} else if(0 == strncmp(option, "use_stdin", 9)) {
 		if (trace_level) warn("# Using stanard in for input.\n");
@@ -738,7 +736,6 @@ init(pTHX) {
 		Perl_croak(aTHX_ "Failed to open output file\n");
 	}
 
-	/*printf("stat block size: %d; os block size %d\n", bufsiz, BUFSIZ);*/
 	print_header();
 
 	/* seed first run time */
@@ -1159,7 +1156,7 @@ load_profile_data_from_file(char *file) {
 				add_entry(aTHX_ fid_line_time_av, file_num, line_num,
 						seconds, eval_file_num, eval_line_num);
 				if (trace_level >= 3)
-				    warn("Read %u:%u as %u ticks\n", file_num, line_num, ticks);
+						warn("Read %d:%-4d %2u ticks (%u, %u)\n", file_num, line_num, ticks);
 
 				if (c == '*') {
 					unsigned int block_line_num = read_int();
@@ -1188,8 +1185,8 @@ load_profile_data_from_file(char *file) {
 				if (NULL == fgets(text, sizeof(text)-1, in))
 					croak("File format error: '%s' in file declaration'", file);
 				if (trace_level)
-				    warn("Read new file %.*s as fid %u (eval fid %u line %u)\n",
-								strlen(text)-1, text, file_num, eval_file_num, eval_line_num);
+				    warn("Fid %u is %.*s (eval fid %u line %u)\n",
+								file_num, strlen(text)-1, text, eval_file_num, eval_line_num);
 
 				if (av_exists(fid_filename_av, file_num))
 					warn("File id %d redefined from %s to %s", file_num,

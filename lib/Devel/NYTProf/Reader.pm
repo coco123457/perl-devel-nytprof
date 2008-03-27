@@ -109,10 +109,12 @@ sub process {
 	my $dump = 0;
 	require Data::Dumper if $dump;
 	warn Data::Dumper::Dumper($data) if $dump;
+
 	my $fid_filename  = $data->{fid_filename};
 	my $dataset_name = $ENV{NYTPROF_DATASET} || 'fid_line_time'; # temp hack
 	my $fid_line_time = $data->{$dataset_name}
 		or die "No $dataset_name data set in profile data\n";
+
 	my $oldstyle = {};
 	for my $fid (1..@$fid_filename-1) {
 
@@ -120,7 +122,8 @@ sub process {
 				or warn "No filename for fid $fid";
 		next if ref $filename; # skip synthetic fids for evals
 
-		my $lines_array = $fid_line_time->[$fid];
+		my $lines_array = $fid_line_time->[$fid]
+			or next; # ignore fid's with no lines executed
 
 		# convert any embedded eval line time arrays to hashes
 		for (@$lines_array) {

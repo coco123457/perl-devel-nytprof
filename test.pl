@@ -95,6 +95,7 @@ sub run_command {
   my @results = <RV>;
   close RV or warn "Error status $? from $cmd\n";
   if ($opts{v}) {
+    print "$cmd\n";
     print @results;
     print "\n";
   }
