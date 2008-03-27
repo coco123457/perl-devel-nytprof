@@ -13,7 +13,7 @@ use Carp;
 use Getopt::Long;
 use Devel::NYTProf::Reader;
 
-our $VERSION = 1.00;
+our $VERSION = 1.01;
 
 use constant NUMERIC_PRECISION    => 5;
 
@@ -34,8 +34,12 @@ if (! -r $opt{file}) {
 }
 
 # handle handle output location
-if (! -r $opt{out}) {
-  die "Unable to access output directory $opt{out}\n";
+if (!-e $opt{out}) {
+	# will be created
+} elsif (!-d $opt{out}) {
+  die "Specified output directory `$opt{out}' is a file. whoops!\n";
+} elsif (!-w $opt{out}) {
+  die "Unable to write to output directory `$opt{out}'\n";
 }
 
 # handle deleting old db's

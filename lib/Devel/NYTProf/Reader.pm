@@ -1,3 +1,4 @@
+# vim: ts=2 sw=2 sts=0 noexpandtab:
 ##########################################################
 ## This script is part of the Devel::NYTProf distribution
 ##
@@ -5,6 +6,8 @@
 ## at the bottom of this file, or by going to:
 ## http://search.cpan.org/~akaplan/Devel-NYTProf
 ##
+###########################################################
+## $Id$
 ###########################################################
 package Devel::NYTProf::Reader;
 
@@ -386,10 +389,9 @@ sub report {
 					} elsif ($hash->{value} eq 'line') {
 						print OUT $LINE;
 					} elsif (exists $self->{data}->{$filestr}->{$LINE}) {
-						print OUT 
-								sprintf("%0.".$self->{numeric_precision}->{$hash->{value}}
-												."l".$FLOAT_FORMAT,
-												$totalsByLine{$LINE}->{$hash->{value}});
+						printf(OUT "%0.".$self->{numeric_precision}->{$hash->{value}}
+										."l".$FLOAT_FORMAT,
+										$totalsByLine{$LINE}->{$hash->{value}});
 					} else {
 						print OUT $hash->{default};
 					}
