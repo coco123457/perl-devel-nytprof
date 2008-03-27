@@ -28,6 +28,7 @@ my %SKIP_TESTS = (
 my %opts;
 GetOptions(\%opts, qw/p=s I=s v/);
 
+$ENV{NYTPROF} = ''; # avoid external interference, but see TEST_NYTPROF below
 my $opt_perl = $opts{p};
 my $opt_include = $opts{I};
 my $outdir = 'profiler';
@@ -105,11 +106,10 @@ sub run_command {
 sub profile {
 	my $test = shift;
 	
-	if ($test eq "test04.p") {
-		$ENV{NYTPROF} = "allowfork";	
-	} else {
-		$ENV{NYTPROF} = "";	
-	}
+	my @NYTPROF;
+	push @NYTPROF, $ENV{TEST_NYTPROF} if $ENV{TEST_NYTPROF};
+	push @NYTPROF, "allowfork" if $test eq "test04.p";
+	local $ENV{NYTPROF} = join ":", @NYTPROF;
 
 	my $t_start = new Benchmark;
 	my @results = run_command("$perl -d:NYTProf $test");
