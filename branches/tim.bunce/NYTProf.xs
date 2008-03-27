@@ -17,9 +17,8 @@
 #include "ppport.h"
 
 #if (PERL_VERSION < 8) || ((PERL_VERSION == 8) && (PERL_SUBVERSION < 8))
-#ifndef PL_curcop
+#undef PL_curcop
 #define PL_curcop ((cxstack + cxstack_ix)->blk_oldcop)
-#endif
 #endif
 
 #if !defined(OutCopFILE)
@@ -339,8 +338,7 @@ void output_int(unsigned int i) {
 }
 
 
-#ifndef DEBUGGING
-static char* PL_block_type[] = {
+static char* block_type[] = {
     "NULL",
     "SUB",
     "EVAL",
@@ -348,7 +346,6 @@ static char* PL_block_type[] = {
     "SUBST",
     "BLOCK",
 };
-#endif
 
 
 /* based on S_dopoptosub_at() from perl pp_ctl.c */
@@ -401,7 +398,7 @@ start_cop_of_context(pTHX_ PERL_CONTEXT *cx) {
     }
     if (!start_op) {
         if (trace_level >= 4)
-            warn("\tstart_cop_of_context: can't find start of %s\n", PL_block_type[CxTYPE(cx)]);
+            warn("\tstart_cop_of_context: can't find start of %s\n", block_type[CxTYPE(cx)]);
         return NULL;
     }
     /* find next cop from OP */
@@ -410,19 +407,19 @@ start_cop_of_context(pTHX_ PERL_CONTEXT *cx) {
         if (type == OP_NEXTSTATE || type == OP_SETSTATE || type == OP_DBSTATE) {
 				  if (trace_level >= 4)
 						warn("\tstart_cop_of_context %s is %s line %d of %s\n",
-							PL_block_type[CxTYPE(cx)], OP_NAME(o), CopLINE((COP*)o), OutCopFILE((COP*)o));
+							block_type[CxTYPE(cx)], OP_NAME(o), CopLINE((COP*)o), OutCopFILE((COP*)o));
 					return (COP*)o;
 				}
         /* should never get here? */
         if (1 || trace_level)
-            warn("\tstart_cop_of_context %s op '%s' isn't a cop", PL_block_type[CxTYPE(cx)], OP_NAME(o));
+            warn("\tstart_cop_of_context %s op '%s' isn't a cop", block_type[CxTYPE(cx)], OP_NAME(o));
         if (trace_level >= 4)
             do_op_dump(1, PerlIO_stderr(), o);
         o = o->op_next;
     }
     if (trace_level >= 3) {
 			warn("\tstart_cop_of_context: can't find next cop for %s line %d\n",
-					PL_block_type[CxTYPE(cx)], CopLINE(PL_curcop));
+					block_type[CxTYPE(cx)], CopLINE(PL_curcop));
 			do_op_dump(1, PerlIO_stderr(), start_op);
 		}
     return NULL;
@@ -461,7 +458,7 @@ visit_contexts(pTHX_ UV stop_at, int (*callback)(pTHX_ PERL_CONTEXT *cx, UV *sto
         cx = &ccstack[cxix];
         if (trace_level >= 4)
 					warn("visit_context: %s cxix %d (si_prev %p)\n",
-							PL_block_type[CxTYPE(cx)], cxix, top_si->si_prev);
+							block_type[CxTYPE(cx)], cxix, top_si->si_prev);
 				if (callback(aTHX_ cx, &stop_at))
 					return cx;
         /* no joy, look further */
@@ -480,7 +477,7 @@ _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 					return 0; /* skip subs in DB package */
 				if (trace_level >= 4) {
 					GV *sv = CvGV(cx->blk_sub.cv);
-					warn("\t%s %s\n", PL_block_type[CxTYPE(cx)], (sv) ? GvNAME(sv) : "");
+					warn("\t%s %s\n", block_type[CxTYPE(cx)], (sv) ? GvNAME(sv) : "");
 					if (trace_level >= 9)
 						sv_dump((SV*)cx->blk_sub.cv);
 				}
@@ -499,7 +496,7 @@ _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 
 	/* NULL, EVAL, LOOP, SUBST, BLOCK context */
 	if (trace_level >= 4)
-		warn("\t%s\n", PL_block_type[CxTYPE(cx)]);
+		warn("\t%s\n", block_type[CxTYPE(cx)]);
 	/* if we've got a block line, skip this context and keep looking for a sub */
 	if (last_block_line)
 		return 0;
@@ -515,7 +512,7 @@ _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 		}
 		/* shouldn't happen! */
 		if (trace_level >= 3)
-			warn("%s in different file (%s, %s)", PL_block_type[CxTYPE(cx)], OutCopFILE(near_cop), OutCopFILE(PL_curcop));
+			warn("%s in different file (%s, %s)", block_type[CxTYPE(cx)], OutCopFILE(near_cop), OutCopFILE(PL_curcop));
 		return 1; /* stop looking */
 	}
 	last_block_line = CopLINE(near_cop);
@@ -1188,9 +1185,12 @@ load_profile_data_from_file(char *file) {
 				    warn("Fid %u is %.*s (eval fid %u line %u)\n",
 								file_num, strlen(text)-1, text, eval_file_num, eval_line_num);
 
-				if (av_exists(fid_filename_av, file_num))
+				if (av_exists(fid_filename_av, file_num)
+				&& strnNE(SvPV_nolen(AvARRAY(fid_filename_av)[file_num]), text, strlen(text)-1)
+				) {
 					warn("File id %d redefined from %s to %s", file_num,
 								SvPV_nolen(AvARRAY(fid_filename_av)[file_num]), text);
+				}
 
 				fid_info_sv = newSVpvn(text, strlen(text)-1); /* drop newline */
 				if (eval_line_num) {
