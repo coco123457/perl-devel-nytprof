@@ -115,6 +115,12 @@ HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
 															double time, int count);
 
+/* macros for outputing profile data */
+#define OUTPUT_PID() STMT_START { \
+	fputc('P', out); output_int(getpid()); output_int(getppid()); \
+} STMT_END
+
+
 /***********************************
  * Devel::NYTProf Functions        *
  ***********************************/
@@ -159,6 +165,9 @@ print_header() {
 		ticks = CLOCKS_PER_SEC;
 	}
 	fprintf(out, "# CLOCKS: %u\n", ticks);
+
+	OUTPUT_PID();
+
 	fflush(out);
 
 	if (forkok)
@@ -561,10 +570,12 @@ DB(pTHX) {
 		if (forkok) {
 #ifdef FPURGE
 			if (last_pid != getpid()) { /* handle forks */
+				last_pid = getpid();
 				FPURGE(out);
 			}
 #endif
 			lock_file();
+			OUTPUT_PID();
 		}
 
 		fputc( (profile_blocks) ? '*' : '+', out);
@@ -582,7 +593,6 @@ DB(pTHX) {
 
 		if (forkok) {
 			unlock_file();
-			last_pid = getpid();
 		}
 	} else {
 		firstrun = 0;
@@ -1003,17 +1013,16 @@ load_profile_data_from_stream() {
 	char text[MAXPATHLEN*2];
 	int c; /* for while loop */
 	HV *profile_hv;
-	AV* fid_filename_av = NULL;
-	AV* fid_line_time_av = NULL;
+	HV *live_pids_hv = newHV();
+	AV* fid_filename_av = newAV();
+	AV* fid_line_time_av = newAV();
 	AV* fid_block_time_av = NULL;
 	AV* fid_sub_time_av = NULL;
 	HV* sub_fid_lines_hv = NULL;
 
-	fid_filename_av   = newAV();
-	fid_line_time_av  = newAV();
 	av_extend(fid_filename_av, 64);  /* grow it up front. */
 
-	while(EOF != (c = fgetc(in))) {
+	while (EOF != (c = fgetc(in))) {
 		input_line++;
 		if (trace_level >= 4)
 			warn("Token %lu is %d ('%c')\n", input_line, c, c);
@@ -1035,9 +1044,6 @@ load_profile_data_from_stream() {
 				filename_sv = *av_fetch(fid_filename_av, file_num, 1);
 				if (!SvOK(filename_sv)) {
 				  warn("File id %u used but not defined", file_num);
-					/* do the best we can */
-					sv_setpv(filename_sv, "UNKNOWN");
-				  file_num = 0;
 				}
 				else if (SvROK(filename_sv)) {	/* is an eval */
 					AV *av = (AV*)SvRV(filename_sv);
@@ -1046,11 +1052,10 @@ load_profile_data_from_stream() {
 					file_num = eval_file_num;
 				}
 
-
 				add_entry(aTHX_ fid_line_time_av, file_num, line_num,
 						seconds, eval_file_num, eval_line_num);
 				if (trace_level >= 3)
-						warn("Read %d:%-4d %2u ticks (%u, %u)\n", file_num, line_num, ticks);
+						warn("Read %d:%-4d %2u ticks\n", file_num, line_num, ticks);
 
 				if (c == '*') {
 					unsigned int block_line_num = read_int();
@@ -1140,6 +1145,30 @@ load_profile_data_from_stream() {
 				break;
 		  }
 
+			case 'P':
+			{
+				unsigned int pid  = read_int();
+				unsigned int ppid = read_int();
+				sprintf(text, "%d", pid);
+				hv_store(live_pids_hv, text, strlen(text), newSVuv(ppid), 0);
+				if (trace_level)
+					warn("Start of profile data for pid %s (ppid %d, %d pids live)\n",
+						text, ppid, HvKEYS(live_pids_hv));
+				break;
+			}
+
+			case 'p':
+			{
+				SV *ppid_sv;
+				unsigned int pid = read_int();
+				sprintf(text, "%d", pid);
+				if (!hv_delete(live_pids_hv, text, strlen(text), 0))
+					warn("inconsistent pids in profile data (pid %d not introduced)", pid);
+				if (trace_level)
+					warn("End of profile data for pid %s, %d remaining\n", text, HvKEYS(live_pids_hv));
+				break;
+			}
+
 			case '#':
 				if (NULL == fgets(text, 1024, in))
 					croak("Profile format error reading attribute definition"); /* probably EOF */
@@ -1154,13 +1183,15 @@ load_profile_data_from_stream() {
 				    warn("# %s", text); /* includes \n */
 				break;
 
-			case ';':
-				break;
-
 			default:
 				croak("File format error: token %d ('%c'), line %lu", c, c, input_line);
 		}
 	}
+
+	if (EOF == c && HvKEYS(live_pids_hv)) {
+		warn("profile data possibly truncated, no terminator for %d pids", HvKEYS(live_pids_hv));
+	}
+	sv_free((SV*)live_pids_hv);
 
 	profile_hv = newHV();
 	hv_store(profile_hv, "fid_filename",   12, newRV_noinc((SV*)fid_filename_av), 0);
@@ -1216,10 +1247,12 @@ _finish(...)
 	if (trace_level)
 		warn("_finish pid %d\n", getpid());
 	sv_setiv(PL_DBsingle, 0);
-	DB(aTHX);
+	DB(aTHX); /* write data for final statement */
 	write_sub_line_ranges(aTHX);
-	if (out)
-	  fputc(';', out);		/* mark end of profile data */
+	if (out) {
+		fputc('p', out); /* mark end of profile data for this pid */
+		output_int(last_pid);
+	}
 
 
 MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Reader
