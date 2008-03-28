@@ -160,7 +160,5 @@ but the cost of copying the result goes to the method (poor).
 Overriding pp_leavesub may allow more accurate measurements by avoiding return
 value processing overheads accumulating on last statement in sub.
 
-eof marker to detect truncation and allow concatenation of streams
-
 getc_unlocked
 fix stats
