@@ -109,7 +109,6 @@ void set_option(const char*);
 void open_file(bool);
 void init_runtime();
 void init(pTHX);
-bool init_reader(const char*);
 void DEBUG_print_stats(pTHX);
 IV   getTicksPerSec();
 HV *load_profile_data_from_file(char*);
@@ -728,7 +727,7 @@ init(pTHX) {
 		warn("NYTProf init pid %d\n", last_pid);
 
 	if (hash == NULL) {
-		Perl_croak(aTHX_ "Debug symbols not found. Is perl in debug mode?");
+		croak("Debug symbols not found. Is perl in debug mode?");
 	}
 
 	/* create file id mapping hash */
@@ -739,7 +738,7 @@ init(pTHX) {
 
 	open_file(0);
 	if (out == NULL) {
-		Perl_croak(aTHX_ "Failed to open output file\n");
+		croak("Failed to open output: %s", strerror(errno));
 	}
 
 	print_header();
@@ -752,7 +751,7 @@ init(pTHX) {
 		gettimeofday(&start_time, NULL);
 #else
 		SV **svp = hv_fetch(PL_modglobal, "Time::U2time", 12, 0);
-		if (!svp || !SvIOK(*svp)) Perl_croak(aTHX_ "Time::HiRes is required");
+		if (!svp || !SvIOK(*svp)) croak("Time::HiRes is required");
 		u2time = INT2PTR(int(*)(pTHX_ UV*), SvIV(*svp));
 		(*u2time)(aTHX_ start_utime);
 #endif
@@ -762,32 +761,6 @@ init(pTHX) {
 /************************************
  * Devel::NYTProf::Reader Functions *
  ************************************/
-
-/**
- * reader specific runtime initialization
- */
-bool
-init_reader(const char* file) {
-
-	init_runtime(file);
-
-	if (READER_use_stdin) {										/* output to stdout */
-		int fd = dup(STDIN_FILENO);
-		if (-1 == fd) {
-			perror("Unable to dup stdin");
-		}
-		in = fdopen(fd, "r");
-	} else if (0 != strlen(READER_input_file)) { /* output to user provided file*/
-		in = fopen(READER_input_file, "rb");
-	} else {																/* output to default output file */
-		in = fopen(default_file, "rb");
-	}
-
-	if (in == NULL) {
-		return 0;
-	}
-	return 1;
-}
 
 /**
  * prints the stats hash in perl syntax ala data::dumper style 
@@ -1003,7 +976,7 @@ read_int() {
 		return newint;
 	} else {
 		dTHX;
-		Perl_croak(aTHX_ "File format error. Unrecognized marker");
+		croak("File format error. Unrecognized marker");
 	}
 }
 
@@ -1030,16 +1003,32 @@ load_profile_data_from_file(char *file) {
 	char text[MAXPATHLEN*2];
 	char c; /* for while loop */
 	HV *profile_hv;
-	AV* fid_filename_av   = newAV();
-	AV* fid_line_time_av  = newAV();
-	AV* fid_block_time_av = newAV();
-	AV* fid_sub_time_av   = newAV();
-	HV* sub_fid_lines_hv  = newHV();
+	AV* fid_filename_av = NULL;
+	AV* fid_line_time_av = NULL;
+	AV* fid_block_time_av = NULL;
+	AV* fid_sub_time_av = NULL;
+	HV* sub_fid_lines_hv = NULL;
 
-	if (! init_reader(file)) {
-		Perl_croak(aTHX_ "Failed to open input file\n");
+	init_runtime(file);
+
+	if (READER_use_stdin) {
+		int fd = dup(STDIN_FILENO);
+		if (-1 == fd)
+			croak("Unable to dup stdin: %s", strerror(errno));
+		in = fdopen(fd, "r");
+	}
+	else if (0 != strlen(READER_input_file)) {
+		in = fopen(READER_input_file, "rb");
+	}
+	else {
+		in = fopen(default_file, "rb");
+	}
+	if (in == NULL) {
+		croak("Failed to open input: %s", strerror(errno));
 	}
 
+	fid_filename_av   = newAV();
+	fid_line_time_av  = newAV();
 	av_extend(fid_filename_av, 64);  /* grow it up front. */
 
 	while(EOF != (c = fgetc(in))) {
@@ -1085,10 +1074,16 @@ load_profile_data_from_file(char *file) {
 					unsigned int block_line_num = read_int();
 					unsigned int sub_line_num   = read_int();
 
+					if (!fid_block_time_av)
+						fid_block_time_av = newAV();
 					add_entry(aTHX_ fid_block_time_av, file_num, block_line_num,
 							seconds, eval_file_num, eval_line_num);
+
+					if (!fid_sub_time_av)
+						fid_sub_time_av = newAV();
 					add_entry(aTHX_ fid_sub_time_av, file_num, sub_line_num,
 							seconds, eval_file_num, eval_line_num);
+
 					if (trace_level >= 3)
 							warn("\tblock %u, sub %u\n", block_line_num, sub_line_num);
 				}
@@ -1150,6 +1145,8 @@ load_profile_data_from_file(char *file) {
 				if (trace_level >= 2)
 				    warn("Sub %.*s fid %u lines %u..%u\n",
 							strlen(text)-1, text, fid, first_line, last_line);
+				if (!sub_fid_lines_hv)
+					sub_fid_lines_hv = newHV();
 				/* { 'pkg::sub' => [ fid, first_line, last_line ], ... } */
 				sv = *hv_fetch(sub_fid_lines_hv, text, strlen(text)-1, 1);
 				if (!SvROK(sv))		/* autoviv */
@@ -1180,15 +1177,16 @@ load_profile_data_from_file(char *file) {
 		}
 	}
 	fclose(in);
-	if ( 0 && trace_level)
-	    DEBUG_print_stats(aTHX);
 
 	profile_hv = newHV();
 	hv_store(profile_hv, "fid_filename",   12, newRV_noinc((SV*)fid_filename_av), 0);
 	hv_store(profile_hv, "fid_line_time",  13, newRV_noinc((SV*)fid_line_time_av), 0);
-	hv_store(profile_hv, "fid_block_time", 14, newRV_noinc((SV*)fid_block_time_av), 0);
-	hv_store(profile_hv, "fid_sub_time",   12, newRV_noinc((SV*)fid_sub_time_av), 0);
-	hv_store(profile_hv, "sub_fid_lines",  13, newRV_noinc((SV*)sub_fid_lines_hv), 0);
+	if (fid_block_time_av)
+		hv_store(profile_hv, "fid_block_time", 14, newRV_noinc((SV*)fid_block_time_av), 0);
+	if (fid_sub_time_av)
+		hv_store(profile_hv, "fid_sub_time",   12, newRV_noinc((SV*)fid_sub_time_av), 0);
+	if (sub_fid_lines_hv)
+		hv_store(profile_hv, "sub_fid_lines",  13, newRV_noinc((SV*)sub_fid_lines_hv), 0);
 	return profile_hv;
 }
 

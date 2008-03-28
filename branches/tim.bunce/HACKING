@@ -163,3 +163,4 @@ value processing overheads accumulating on last statement in sub.
 eof marker to detect truncation and allow concatenation of streams
 
 getc_unlocked
+fix stats
