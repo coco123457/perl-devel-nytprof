@@ -111,7 +111,7 @@ void init_runtime();
 void init(pTHX);
 void DEBUG_print_stats(pTHX);
 IV   getTicksPerSec();
-HV *load_profile_data_from_file(char*);
+HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
 															double time, int count);
 
@@ -247,8 +247,8 @@ get_file_id(char* file_name, STRLEN file_name_len) {
 	dTHX;
 	Hash_entry entry, *found;
 
-  /* AutoLoader adds some information to Perl's internal file name that we have
-     to remove or else the file path will be borked */
+	/* AutoLoader adds some information to Perl's internal file name that we have
+	   to remove or else the file path will be borked */
 	if (')' == file_name[file_name_len - 1]) {
 		char* new_end = strstr(file_name, " (autosplit ");
 		if (new_end)
@@ -993,7 +993,7 @@ read_int() {
  * data for each line of the string eval.
  */
 HV*
-load_profile_data_from_file(char *file) {
+load_profile_data_from_stream() {
 	dTHX; 
 
 	unsigned long input_line = 0L;
@@ -1001,31 +1001,13 @@ load_profile_data_from_file(char *file) {
 	unsigned int line_num;
 	unsigned int ticks;
 	char text[MAXPATHLEN*2];
-	char c; /* for while loop */
+	int c; /* for while loop */
 	HV *profile_hv;
 	AV* fid_filename_av = NULL;
 	AV* fid_line_time_av = NULL;
 	AV* fid_block_time_av = NULL;
 	AV* fid_sub_time_av = NULL;
 	HV* sub_fid_lines_hv = NULL;
-
-	init_runtime(file);
-
-	if (READER_use_stdin) {
-		int fd = dup(STDIN_FILENO);
-		if (-1 == fd)
-			croak("Unable to dup stdin: %s", strerror(errno));
-		in = fdopen(fd, "r");
-	}
-	else if (0 != strlen(READER_input_file)) {
-		in = fopen(READER_input_file, "rb");
-	}
-	else {
-		in = fopen(default_file, "rb");
-	}
-	if (in == NULL) {
-		croak("Failed to open input: %s", strerror(errno));
-	}
 
 	fid_filename_av   = newAV();
 	fid_line_time_av  = newAV();
@@ -1052,7 +1034,7 @@ load_profile_data_from_file(char *file) {
 
 				filename_sv = *av_fetch(fid_filename_av, file_num, 1);
 				if (!SvOK(filename_sv)) {
-				  warn("File id %d not defined in file '%s'", file_num, file);
+				  warn("File id %u used but not defined", file_num);
 					/* do the best we can */
 					sv_setpv(filename_sv, "UNKNOWN");
 				  file_num = 0;
@@ -1102,7 +1084,7 @@ load_profile_data_from_file(char *file) {
 				eval_line_num = read_int();
 
 				if (NULL == fgets(text, sizeof(text)-1, in))
-					croak("File format error: '%s' in file declaration'", file);
+					croak("Profile format error while reading fid declaration"); /* probably EOF */
 				if (trace_level) {
 						if (eval_file_num)
 							warn("Fid %2u is %.*s (eval fid %u line %u)\n",
@@ -1141,7 +1123,7 @@ load_profile_data_from_file(char *file) {
 				unsigned int first_line = read_int();
 				unsigned int last_line  = read_int();
 				if (NULL == fgets(text, sizeof(text)-1, in))
-					croak("File format error: '%s' in sub line range'", file);
+					croak("Profile format error in sub line range"); /* probably EOF */
 				if (trace_level >= 2)
 				    warn("Sub %.*s fid %u lines %u..%u\n",
 							strlen(text)-1, text, fid, first_line, last_line);
@@ -1160,7 +1142,7 @@ load_profile_data_from_file(char *file) {
 
 			case '#':
 				if (NULL == fgets(text, 1024, in))
-					croak("Error reading '%s' at line %lu", file, input_line);
+					croak("Profile format error reading attribute definition"); /* probably EOF */
 
 				if (0 == strncmp(text, " CLOCKS: ", 9)) {
 					char* end = &text[strlen(text) - 2];
@@ -1172,11 +1154,13 @@ load_profile_data_from_file(char *file) {
 				    warn("# %s", text); /* includes \n */
 				break;
 
+			case ';':
+				break;
+
 			default:
 				croak("File format error: token %d ('%c'), line %lu", c, c, input_line);
 		}
 	}
-	fclose(in);
 
 	profile_hv = newHV();
 	hv_store(profile_hv, "fid_filename",   12, newRV_noinc((SV*)fid_filename_av), 0);
@@ -1235,7 +1219,7 @@ _finish(...)
 	DB(aTHX);
 	write_sub_line_ranges(aTHX);
 	if (out)
-		fflush(out);
+	  fputc(';', out);		/* mark end of profile data */
 
 
 MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Reader
@@ -1244,6 +1228,28 @@ PROTOTYPES: DISABLE
 HV*
 load_profile_data_from_file(file=NULL)
 	char *file;
+	CODE:
+	init_runtime(file);
+
+	if (READER_use_stdin) {
+		int fd = dup(STDIN_FILENO);
+		if (-1 == fd)
+			croak("Unable to dup stdin: %s", strerror(errno));
+		in = fdopen(fd, "r");
+	}
+	else if (0 != strlen(READER_input_file)) {
+		in = fopen(READER_input_file, "rb");
+	}
+	else {
+		in = fopen(default_file, "rb");
+	}
+	if (in == NULL) {
+		croak("Failed to open input: %s", strerror(errno));
+	}
+	RETVAL = load_profile_data_from_stream();
+	fclose(in);
+	OUTPUT:
+	RETVAL
 
 IV
 getDatabaseTime()
