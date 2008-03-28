@@ -104,6 +104,11 @@ sub profile {
 		print "\n";
 		print @results;
 	}
+
+	# special case
+	if ($test eq "test16.p") {
+		rename $test, "$test.temp";
+	}
 	#print timestr( $t_total, 'nop' ), "\n";
 }
 
@@ -136,11 +141,16 @@ sub verify_report {
 	open(RV, "$perl $fprofcsv |") or die "fprofcvs can't run $!\n";
 	my $results = <RV>;
 	close RV;
+
 	if ($opts{v}) {
 		print <RV>;
 		print "\n";
 	}
 
+	# special case
+	if ($test eq "test16.x") {
+		rename "test16.p.temp", "test16.p";
+	}
 
 	# parse/check
   my $infile;
