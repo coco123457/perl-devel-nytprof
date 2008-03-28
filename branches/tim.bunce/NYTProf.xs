@@ -293,8 +293,14 @@ get_file_id(char* file_name, STRLEN file_name_len) {
 
 		if (forkok)
 			unlock_file();
-		if (trace_level)
-		  warn("New fid %d: %.*s\n", found->id, found->key_len, found->key);
+		if (trace_level) {
+			if (eval_fid)
+				warn("New fid %2u: %.*s (eval fid %u line %u)\n",
+					found->id, found->key_len, found->key, eval_fid, eval_line_num);
+		  else
+				warn("New fid %2u: %.*s\n",
+					found->id, found->key_len, found->key);
+		}
 	}
 	else if (trace_level >= 4)
 		warn("fid %d: %.*s\n", found->id, found->key_len, found->key);
@@ -718,6 +724,9 @@ init(pTHX) {
 		 NOTE: don't fork before calling the xsloader obviously! */
 	last_pid = getpid();
 
+	if (trace_level)
+		warn("NYTProf init pid %d\n", last_pid);
+
 	if (hash == NULL) {
 		Perl_croak(aTHX_ "Debug symbols not found. Is perl in debug mode?");
 	}
@@ -835,131 +844,6 @@ DEBUG_print_stats(pTHX) {
 	printf("};\n");
 }
 
-/**
- * Save information about the current line.
- * TODO SLOW! Next on the list for a rewrite.
- */
-void
-addline(pTHX_ unsigned int line, float time, const char* _file) {
-
-	char* file; /* = (char*)malloc(sizeof(char)*strlen(_file) + 1);*/
-	int file_len = 0;
-	/* used for evals */
-	bool eval_mode = 0;
-	int eline = 0;
-	float etime = 0;
-	/* used in files block */
-	SV** file_hv_ref;
-	HV* file_hv;
-	/* used in lines block */
-	char line_str[50];
-	SV** line_av_ref;
-	AV* line_av;
-
-	if (0 != strncmp(_file, "(eval", 5)) {
-		file = (char *)_file;
-		file_len = strlen(file);
-	}
-	else {
-		/* its an eval! 'line' is _in_ the eval. File and line number in 'file' */
-		char* start = strchr(_file, '[');
-		char* end = strrchr(_file, ':');
-		if (!start || !end) {
-			warn("Ignoring invalid filename syntax '%s'\n", _file);
-			return;
-		}
-		eval_mode = 1;
-		file = ++start;
-		file_len = end - start;
-		/* line number in eval block */
-		eline = line;
-		/* line number in _file_ */
-		line = atoi(end + sizeof(char));
-		/* time for this line in the eval block */
-		etime = time;
-		/* execution time for the file line will be added seperately later */
-		time = 0;	
-		if (trace_level)
-				warn("File: %s, line: %d, time: %f, eval line: %d, eval time: %f\n",
-						file, line, time, eline, etime);
-	}
-
-	/* AutoLoader adds some information to Perl's internal file name that we have
-   to remove or else the file path will be borked */
-	if (')' == file[file_len - 1]) {
-		char* new_end = strstr(file, " (autosplit ");
-		file_len = new_end - file;
-	}
-
-	file_hv_ref = hv_fetch(profile, file, file_len, 0);
-	
-	if (NULL == file_hv_ref) {
-		file_hv = newHV();
-		hv_store(profile, file, file_len, newRV_noinc((SV*)file_hv), 0);
-	} else {
-		file_hv = (HV*)SvRV(*file_hv_ref);
-	}
-
-	sprintf(line_str, "%u", line);
-	line_av_ref = hv_fetch(file_hv, line_str, strlen(line_str), 0);
-
-	if (NULL == line_av_ref) {
-		int true_calls = (eval_mode)?0:1;
-
-		line_av = newAV();
-		av_store(line_av, 0, newSVnv(time));		/* time */
-		av_store(line_av, 1, newSViv(true_calls));				/* calls */
-		hv_store(file_hv, line_str, strlen(line_str), newRV_noinc((SV*)line_av), 0);
-	} else {
-		SV** time_sv_p;
-		SV** calls_sv_p;
-
-		line_av = (AV*)SvRV(*line_av_ref);
-		time_sv_p = av_fetch(line_av, 0, 0);
-		sv_setnv(*time_sv_p, time + SvNVX(*time_sv_p));
-		calls_sv_p = av_fetch(line_av, 1, 0);
-
-		if (!eval_mode) {
-			sv_inc(*calls_sv_p);
-		}
-	}
-
-	if (eval_mode) {
-		SV** eval_hv_ref = av_fetch(line_av, 2, 0);
-		HV* eval_hv;
-		SV** eval_av_ref;
-		AV* eval_av;
-
-		sprintf(line_str, "%d", eline); /* key */
-
-		if (NULL == eval_hv_ref) {
-			eval_hv = newHV();
-			av_store(line_av, 2, newRV_noinc((SV*)eval_hv));
-		} else {
-			eval_hv = (HV*)SvRV(*eval_hv_ref);
-		}
-
-		eval_av_ref = hv_fetch(eval_hv, line_str, strlen(line_str), 0);
-
-		if (NULL == eval_av_ref) {
-			eval_av = newAV(); /* value */
-			av_store(eval_av, 0, newSVnv(etime));
-			av_store(eval_av, 1, newSViv(1));
-			hv_store(eval_hv, line_str, strlen(line_str), newRV_noinc((SV*)eval_av), 
-								0);
-		} else {
-			SV** time_sv_p;
-			SV** calls_sv_p;
-
-			eval_av = (AV*)SvRV(*eval_av_ref);
-			time_sv_p = av_fetch(eval_av, 0, 0);
-			sv_setnv(*time_sv_p, etime + SvIV(*time_sv_p));
-			calls_sv_p = av_fetch(eval_av, 1, 0);
-			sv_inc(*calls_sv_p);
-		}
-	}
-}
-
 
 void
 add_entry(pTHX_ AV *dest_av, unsigned int file_num, unsigned int line_num,			
@@ -1012,6 +896,45 @@ store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, double time,
 		}
 	}
 	return line_av;
+}
+
+
+void
+write_sub_line_ranges(pTHX) {
+  char *sub_name;
+	I32 sub_name_len;
+  SV *file_lines_sv;
+  HV *hv = GvHV(PL_DBsub);
+
+	hv_iterinit(hv);
+  while (NULL != (file_lines_sv = hv_iternextsv(hv, &sub_name, &sub_name_len))) {
+		char *file_lines = SvPV_nolen(file_lines_sv); /* "filename:first-last" */
+		char *first = strrchr(file_lines, ':');
+		char *last = (first) ? strchr(first, '-') : NULL;
+	  unsigned int fid;
+	  UV first_line, last_line;
+
+	  if (!first || !last || !grok_number(first+1, last-first-1, &first_line)) {
+			warn("Can't parse %%DB::sub entry for %s '%s'\n", sub_name, file_lines);
+			continue;
+		} 
+		last_line = atoi(++last);
+
+		if (!first_line && !last_line && strstr(sub_name, "::BEGIN"))
+			continue;	/* no point writing these */
+
+		fid = get_file_id(file_lines, first - file_lines);
+		if (trace_level >= 2)
+			warn("Sub %s fid %u lines %u..%u\n", sub_name, fid, first_line, last_line);
+
+		fputc('s', out);
+		output_int(fid);
+		output_int(first_line);
+		output_int(last_line);
+		fputs(sub_name, out);
+		fputc('\n', out);
+  }
+
 }
 
 /**
@@ -1111,6 +1034,7 @@ load_profile_data_from_file(char *file) {
 	AV* fid_line_time_av  = newAV();
 	AV* fid_block_time_av = newAV();
 	AV* fid_sub_time_av   = newAV();
+	HV* sub_fid_lines_hv  = newHV();
 
 	if (! init_reader(file)) {
 		Perl_croak(aTHX_ "Failed to open input file\n");
@@ -1120,6 +1044,8 @@ load_profile_data_from_file(char *file) {
 
 	while(EOF != (c = fgetc(in))) {
 		input_line++;
+		if (trace_level >= 4)
+			warn("Token %lu is %d ('%c')\n", input_line, c, c);
 
 		switch (c) {
 			case '*':			/*FALLTHRU*/
@@ -1169,6 +1095,7 @@ load_profile_data_from_file(char *file) {
 
 				break;
 			}
+
 			case '@':
 			{
 				SV *fid_info_sv;
@@ -1181,9 +1108,14 @@ load_profile_data_from_file(char *file) {
 
 				if (NULL == fgets(text, sizeof(text)-1, in))
 					croak("File format error: '%s' in file declaration'", file);
-				if (trace_level)
-				    warn("Fid %u is %.*s (eval fid %u line %u)\n",
-								file_num, strlen(text)-1, text, eval_file_num, eval_line_num);
+				if (trace_level) {
+						if (eval_file_num)
+							warn("Fid %2u is %.*s (eval fid %u line %u)\n",
+									file_num, strlen(text)-1, text, eval_file_num, eval_line_num);
+						else
+							warn("Fid %2u is %.*s\n",
+									file_num, strlen(text)-1, text);
+				}
 
 				if (av_exists(fid_filename_av, file_num)
 				&& strnNE(SvPV_nolen(AvARRAY(fid_filename_av)[file_num]), text, strlen(text)-1)
@@ -1205,6 +1137,30 @@ load_profile_data_from_file(char *file) {
 				av_store(fid_filename_av, file_num, fid_info_sv);
 				break;
 			}
+
+			case 's':	/* subroutine file line range */
+			{
+				SV *sv;
+				AV *av;
+				unsigned int fid        = read_int();
+				unsigned int first_line = read_int();
+				unsigned int last_line  = read_int();
+				if (NULL == fgets(text, sizeof(text)-1, in))
+					croak("File format error: '%s' in sub line range'", file);
+				if (trace_level >= 2)
+				    warn("Sub %.*s fid %u lines %u..%u\n",
+							strlen(text)-1, text, fid, first_line, last_line);
+				/* { 'pkg::sub' => [ fid, first_line, last_line ], ... } */
+				sv = *hv_fetch(sub_fid_lines_hv, text, strlen(text)-1, 1);
+				if (!SvROK(sv))		/* autoviv */
+						sv_setsv(sv, newRV_noinc((SV*)newAV()));
+				av = (AV*)SvRV(sv);
+				av_store(av, 0, newSVuv(fid));
+				av_store(av, 1, newSVuv(first_line));
+				av_store(av, 2, newSVuv(last_line));
+				break;
+		  }
+
 			case '#':
 				if (NULL == fgets(text, 1024, in))
 					croak("Error reading '%s' at line %lu", file, input_line);
@@ -1220,7 +1176,7 @@ load_profile_data_from_file(char *file) {
 				break;
 
 			default:
-				croak("File format error: '%s', line %lu", file, input_line);
+				croak("File format error: token %d ('%c'), line %lu", c, c, input_line);
 		}
 	}
 	fclose(in);
@@ -1232,6 +1188,7 @@ load_profile_data_from_file(char *file) {
 	hv_store(profile_hv, "fid_line_time",  13, newRV_noinc((SV*)fid_line_time_av), 0);
 	hv_store(profile_hv, "fid_block_time", 14, newRV_noinc((SV*)fid_block_time_av), 0);
 	hv_store(profile_hv, "fid_sub_time",   12, newRV_noinc((SV*)fid_sub_time_av), 0);
+	hv_store(profile_hv, "sub_fid_lines",  13, newRV_noinc((SV*)sub_fid_lines_hv), 0);
 	return profile_hv;
 }
 
@@ -1278,6 +1235,7 @@ _finish(...)
 		warn("_finish pid %d\n", getpid());
 	sv_setiv(PL_DBsingle, 0);
 	DB(aTHX);
+	write_sub_line_ranges(aTHX);
 	if (out)
 		fflush(out);
 
