@@ -102,7 +102,7 @@ static unsigned int ticks_per_sec = 1;
 void lock_file();
 void unlock_file();
 void print_header();
-unsigned int get_file_id(char*, STRLEN);
+unsigned int get_file_id(char*, STRLEN, int);
 void output_int(unsigned int);
 void DB(pTHX);
 void set_option(const char*);
@@ -251,7 +251,7 @@ hash_op (Hash_entry entry, Hash_entry** retval, bool insert) {
  * Return a unique id number for this file.  Persists across calls.
  */
 unsigned int
-get_file_id(char* file_name, STRLEN file_name_len) {
+get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 
 	dTHX;
 	Hash_entry entry, *found;
@@ -266,7 +266,7 @@ get_file_id(char* file_name, STRLEN file_name_len) {
 	entry.key = file_name;
 	entry.key_len = file_name_len;
 
-	if(1 == hash_op(entry, &found, 1)) {	/* inserted new entry */
+	if(1 == hash_op(entry, &found, create_new)) {	/* inserted new entry */
 	  /* if this is a synthetic filename for an 'eval'
 		 * ie "(eval 42)[/some/filename.pl:line]"
 		 * then ensure we've already generated an id for the underlying filename
@@ -284,7 +284,7 @@ get_file_id(char* file_name, STRLEN file_name_len) {
 				return 0;
 			}
 			++start; /* move past [ */
-			eval_fid = get_file_id(start, end - start);	/* recurse */
+			eval_fid = get_file_id(start, end - start, create_new);	/* recurse */
 			eval_line_num = atoi(end+1);
 		}
 
@@ -310,8 +310,12 @@ get_file_id(char* file_name, STRLEN file_name_len) {
 					found->id, found->key_len, found->key);
 		}
 	}
-	else if (trace_level >= 4)
+	else if (!found) {
+		return 0;
+  }
+  else if (trace_level >= 4) {
 		warn("fid %d: %.*s\n", found->id, found->key_len, found->key);
+	}
 
 	return found->id;
 }
@@ -599,7 +603,7 @@ DB(pTHX) {
 	}
 
 	file = OutCopFILE(cop);
-	last_executed_file = get_file_id(file, strlen(file));
+	last_executed_file = get_file_id(file, strlen(file), 1);
 	last_executed_line = CopLINE(cop);
 
   if (profile_blocks) {
@@ -772,62 +776,6 @@ init(pTHX) {
  * Devel::NYTProf::Reader Functions *
  ************************************/
 
-/**
- * prints the stats hash in perl syntax ala data::dumper style 
- */
-void
-DEBUG_print_stats(pTHX) {
-	int numkeys = hv_iterinit(profile);
-	/* outer vars */
-	SV* line_hv_rv;
-	char* filename[255];
-	I32 name_len;
-	/* inner vars */
-	SV* cur_av_rv;
-	char* linenum[255];
-	I32 linenum_len;
-
-	printf("Stored data for %d keys\n", numkeys);
-
-	printf("$hash = {\n");
-	while(NULL != (line_hv_rv = hv_iternextsv(profile, filename, &name_len))) {
-		HV* line_hv = (HV*)SvRV(line_hv_rv);
-		hv_iterinit(line_hv);
-		printf ("  '%s' => {\n", *filename);
-
-		while(NULL != (cur_av_rv = hv_iternextsv(line_hv, linenum, &linenum_len))) {
-			AV* cur_av = (AV*)SvRV(cur_av_rv);
-			int calls = SvIV(*av_fetch(cur_av, 1, 0));
-			float time = SvNV(*av_fetch(cur_av, 0, 0));
-			SV** evals_hv_ref = av_fetch(cur_av, 2, 0);
-			SV* evals_av_ref;
-
-			printf("    '%s' => [ %f, %d", *linenum, time, calls);
-
-			if (NULL != evals_hv_ref) {
-				HV* evals_hv = (HV*)SvRV(*evals_hv_ref);
-				char* e_linenum[255];
-
-				printf (", {\n");
-				while(NULL != (evals_av_ref = hv_iternextsv(evals_hv, e_linenum,
-																										&name_len))) {
-					AV* evals_av = (AV*)SvRV(evals_av_ref);
-					calls = SvIV(*av_fetch(evals_av, 1, 0));
-					time = SvNV(*av_fetch(evals_av, 0, 0));
-
-					printf("                              '%s' => [ %f, %d ],\n", 
-									*e_linenum, time, calls);
-				}
-				printf("                          },\n");
-			}
- 			printf("           ],\n");
-		}
-		printf("  },\n");
-	}
-	printf("};\n");
-}
-
-
 void
 add_entry(pTHX_ AV *dest_av, unsigned int file_num, unsigned int line_num,			
 					double time, unsigned int eval_file_num, unsigned int eval_line_num) 
@@ -906,7 +854,10 @@ write_sub_line_ranges(pTHX) {
 		if (!first_line && !last_line && strstr(sub_name, "::BEGIN"))
 			continue;	/* no point writing these */
 
-		fid = get_file_id(file_lines, first - file_lines);
+		fid = get_file_id(file_lines, first - file_lines, 0);
+		if (!fid)  /* no point in writing subs we've not profiled */
+			continue;
+
 		if (trace_level >= 2)
 			warn("Sub %s fid %u lines %u..%u\n", sub_name, fid, first_line, last_line);
 
