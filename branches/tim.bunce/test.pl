@@ -40,7 +40,7 @@ mkdir $outdir or die "mkdir($outdir): $!" unless -d $outdir;
 s:^t/:: for @ARGV; # allow args to use t/ prefix
 my @tests = @ARGV ? @ARGV : sort <*.p *.v *.x>;  # glob-sort, for OS/2
 
-plan tests => 3 + @tests;
+plan tests => 3 + number_of_tests(@tests);
 
 use_ok('Devel::NYTProf::Reader');
 
@@ -82,13 +82,13 @@ foreach my $test (@tests) {
 		} elsif($2 eq 'v') {
 			SKIP: {
         skip "Tests incompatible with your perl version", 1, 
-              if (defined($SKIP_TESTS{$1}) and $SKIP_TESTS{$1});
+              if $SKIP_TESTS{$1};
         verify_result($test);
       }
 		} elsif($2 eq 'x') {
 			SKIP: {
-        skip "Tests incompatible with your perl version", 1, 
-              if (defined($SKIP_TESTS{$1}) and $SKIP_TESTS{$1});
+        skip "Tests incompatible with your perl version", 2, 
+              if $SKIP_TESTS{$1};
         verify_report($test);
 		  }
 		}
@@ -189,6 +189,7 @@ sub verify_report {
     }
   }
  
+	my @accuracy_errors;
 	$index = 0;
 	my $limit = scalar(@got)-1;
 	while ($index < $limit) {
@@ -205,10 +206,11 @@ sub verify_report {
 		my $tc0 = $3;
 
 		if (0 != $expected[$index] =~ s/^\|([0-9.]+)\|(.*)/0$2/o) {
-			# Test times. expected to be within 200ms
-			ok(abs($1 - $t0) < 0.2, "Time accuracy - $test line $index");
+			push @accuracy_errors, "$test line $index: got $t0 expected ~$1 for time"
+				if abs($1 - $t0) > 0.2; # Test times. expected to be within 200ms
 			my $tc = $t0 / $c0;
-			ok(abs($tc - $tc0) < 0.2, "Time/Call accuracy - $test line $index");
+			push @accuracy_errors, "$test line $index: got $tc0 expected ~$tc for time/calls"
+				if abs($tc - $tc0) > 0.00002; # expected to be very close (rounding errors only)
 		}
 
 		push @got, $_;
@@ -222,6 +224,7 @@ sub verify_report {
 	}
 
 	is_deeply(\@got, \@expected, $test);
+	is(join("\n",@accuracy_errors), '', $test);
 }
 
 sub pop_times {
@@ -231,6 +234,15 @@ sub pop_times {
 		shift @{$hash->{$key}};
 		pop_times($hash->{$key}->[1]);
 	}
+}
+
+sub number_of_tests {
+	my $tests = 0;
+	for (@_) {
+		next unless m/\.(.)$/;
+		$tests += { p => 1, v => 1, x => 2 }->{$1};
+	}
+	return $tests;
 }
 
 # vim:ts=2:sw=2
