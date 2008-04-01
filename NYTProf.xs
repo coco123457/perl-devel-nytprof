@@ -64,6 +64,10 @@ static Hash_table hashtable = {NULL, MAX_HASH_SIZE};
 
 static char error[255];
 
+/* constants */
+static struct flock lockl;	/* initialised in init() */
+static struct flock locku;	/* initialised in init() */
+
 /* defaults */
 static char* default_file = "nytprof.out";
 static FILE* out;
@@ -130,8 +134,10 @@ AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num,
  */
 void
 lock_file() {
-	static struct flock lockl = { F_WRLCK, SEEK_SET, 0, 0 };
-	fcntl(fileno(out), F_SETLKW, 	&lockl);
+	if (fcntl(fileno(out), F_SETLKW, 	&lockl) == -1) {
+		dTHX; /* should never happen */
+		warn("fcntl F_SETLKW lock failed: %s\n", strerror(errno));
+  }
 }
 
 /**
@@ -140,8 +146,10 @@ lock_file() {
 void
 unlock_file() {
 	fflush(out);
-	static struct flock locku = { F_UNLCK, SEEK_SET, 0, 0 };
-	fcntl(fileno(out), F_SETLK, 	&locku);
+	if (fcntl(fileno(out), F_SETLKW, 	&locku) == -1) {
+		dTHX; /* should never happen */
+		warn("fcntl F_SETLKW unlock failed: %s\n", strerror(errno));
+  }
 }
 
 /**
@@ -731,6 +739,12 @@ init_runtime(const char* file) {
 void
 init(pTHX) {
 	HV* hash = get_hv("DB::sub", 0);
+
+	/* initialize flock structs portably */
+	lockl.l_type   = F_WRLCK;
+	lockl.l_whence = SEEK_SET;
+	locku.l_type   = F_UNLCK;
+	locku.l_whence = SEEK_SET;
 
 	/* Save the process id early. We can monitor it to detect forks that affect 
 		 output buffering.
