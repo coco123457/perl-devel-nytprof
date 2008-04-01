@@ -72,6 +72,7 @@ static struct flock locku;	/* initialised in init() */
 static char* default_file = "nytprof.out";
 static FILE* out;
 static FILE* in;
+static pid_t first_pid;
 static pid_t last_pid;
 static bool forkok = 0;
 static bool usecputime = 0;
@@ -256,7 +257,12 @@ hash_op (Hash_entry entry, Hash_entry** retval, bool insert) {
 }
 
 /**
- * Return a unique id number for this file.  Persists across calls.
+ * Return a unique persistent id number for a file.
+ * If file name has not been seen before
+ * then, if create_new is false it returns 0 othwise it
+ * assigns a new id and outputs the file and id to the stream.
+ * If the file name is a synthetic name for an eval then
+ * get_file_id recurses to process the 'embedded' file name first.
  */
 unsigned int
 get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
@@ -611,7 +617,9 @@ DB(pTHX) {
 	}
 
 	file = OutCopFILE(cop);
-	last_executed_file = get_file_id(file, strlen(file), 1);
+	/* XXX temporary restriction until we get better support for forking  */
+	/* if we've forked then we no longer allow new fids to be generated   */
+	last_executed_file = get_file_id(file, strlen(file), (last_pid == first_pid));
 	last_executed_line = CopLINE(cop);
 
   if (profile_blocks) {
@@ -749,7 +757,7 @@ init(pTHX) {
 	/* Save the process id early. We can monitor it to detect forks that affect 
 		 output buffering.
 		 NOTE: don't fork before calling the xsloader obviously! */
-	last_pid = getpid();
+	last_pid = first_pid = getpid();
 
 	if (trace_level)
 		warn("NYTProf init pid %d\n", last_pid);
@@ -845,7 +853,7 @@ store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, double time,
 
 
 void
-write_sub_line_ranges(pTHX) {
+write_sub_line_ranges(pTHX, int fids_only) {
   char *sub_name;
 	I32 sub_name_len;
   SV *file_lines_sv;
@@ -869,7 +877,9 @@ write_sub_line_ranges(pTHX) {
 			continue;	/* no point writing these */
 
 		fid = get_file_id(file_lines, first - file_lines, 0);
-		if (!fid)  /* no point in writing subs we've not profiled */
+		if (!fid)  /* no point in writing subs in files we've not profiled */
+			continue;
+		if (fids_only)  /* caller just wants fids assigned */
 			continue;
 
 		if (trace_level >= 2)
@@ -1191,6 +1201,16 @@ init()
 		init(aTHX);
 
 void
+_assign_fids();
+	CODE:
+	/* if we may fork then assign fids to all (currently) known files
+	 * to limit the impact of the restriction on assigning fids
+	 * after a fork
+	 */
+	if (forkok)
+		write_sub_line_ranges(aTHX, 1);
+
+void
 enable_profile(...)
 	PPCODE:
 		IV prev_DBsingle = SvIV(PL_DBsingle);
@@ -1213,7 +1233,7 @@ _finish(...)
 		warn("_finish pid %d\n", getpid());
 	sv_setiv(PL_DBsingle, 0);
 	DB(aTHX); /* write data for final statement */
-	write_sub_line_ranges(aTHX);
+	write_sub_line_ranges(aTHX, 0);
 	if (out) {
 		fputc('p', out); /* mark end of profile data for this pid */
 		output_int(last_pid);
