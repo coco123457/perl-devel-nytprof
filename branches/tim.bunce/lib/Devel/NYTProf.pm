@@ -64,6 +64,9 @@ BEGIN {
 	time only.  This is a new mechanism and the details may change.
 =cut
 
+INIT {
+	_assign_fids()
+}
 
 END {
 	# cleanup
@@ -172,6 +175,11 @@ and ext_stdio.h (if present).  See the CPAN Testers results on the distribution
 page.
 
 =head1 BUGS
+
+Currently processes which fork after initializing the profiler aren't able to
+output correct file ids for any files which haven't already been 'seen' by the
+profiler. That means any file loaded after the program starts, or any string evals.
+This limitation will be fixed in a future version.
 
 No Windows support.  I didn't test on Windows and it probably won't work.
 
