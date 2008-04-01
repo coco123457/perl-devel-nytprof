@@ -143,21 +143,21 @@ TODO
 Formalize '#' processing: write more info and store into hash on reading.
 Use that to fix getDatabaseTime() getTicksPerSec() etc.
 
+Rework option parsing so options can be implemented in and access from perl.
+
 Write tests for new functionality.
 
 Write up change notes
 
 Write documentation
 
-Add <a name=$line_number> to html output
-
-(tim.bunce)
-Gather data for where subs are called from and write to file.
-Using caller() in DB::sub is limited, sadly, as it can't see immediate caller.
-Try overriding pp_entersub pointer in PL_ppaddr[]
+Add <a name=$line_number> to html output to enable linking to lines
+(needed for 'sub caller' linking)
 
 (tim.bunce)
 Currently the cost of calling the sub goes to the caller (good)
 but the cost of copying the result goes to the method (poor).
 Overriding pp_leavesub may allow more accurate measurements by avoiding return
 value processing overheads accumulating on last statement in sub.
+
+fork statement gets counted twice currently. set elapsed=0 if pid changes

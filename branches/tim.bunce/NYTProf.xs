@@ -120,6 +120,10 @@ HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
 															double time, int count);
 
+OP *pp_entersub_profiler(pTHX);
+OP *(*pp_entersub_orig)(pTHX);
+HV *sub_callers_hv;
+
 /* macros for outputing profile data */
 #define OUTPUT_PID() STMT_START { \
 	fputc('P', out); output_int(getpid()); output_int(getppid()); \
@@ -315,6 +319,7 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 
 		if (forkok)
 			unlock_file();
+
 		if (trace_level) {
 			if (eval_fid)
 				warn("New fid %2u: %.*s (eval fid %u line %u)\n",
@@ -585,15 +590,18 @@ DB(pTHX) {
 		return;
 
 	if (!firstrun) { 
-		if (forkok) {
-#ifdef FPURGE
-			if (last_pid != getpid()) { /* handle forks */
-				last_pid = getpid();
-				FPURGE(out);
-			}
-#endif
+		if (forkok)
 			lock_file();
-			OUTPUT_PID();
+		if (forkok) {
+			if (last_pid != getpid()) { /* handle forks */
+				if (trace_level >= 1)
+					warn("New pid %d (was %d)\n", getpid(), last_pid);
+				last_pid = getpid();
+#ifdef FPURGE
+				FPURGE(out);
+#endif
+				OUTPUT_PID();
+			}
 		}
 
 		fputc( (profile_blocks) ? '*' : '+', out);
@@ -705,6 +713,71 @@ open_file(bool forked) {
 	out = (filename) ? fopen(filename, mode) : fdopen(fd, mode);
 }
 
+
+/************************************
+ * Sub caller tracking
+ ************************************/
+
+void
+intercept_opcodes(pTHX) {
+	sub_callers_hv = newHV();
+	pp_entersub_orig = PL_ppaddr[OP_ENTERSUB];
+	PL_ppaddr[OP_ENTERSUB] = pp_entersub_profiler;
+}
+
+OP *
+pp_entersub_profiler(pTHX) {
+	OP *op;
+	COP *prev_cop = NULL;
+	OP *next_op = PL_op->op_next; /* op to execute after sub returns */
+
+	if (cxstack_ix >= 0)	/* dodge wierdness */
+		prev_cop = PL_curcop;
+
+	/*
+	 * for normal subs pp_entersub enters the sub
+	 * and returns the first op *within* the sub (typically a dbstate).
+	 * for XS subs pp_entersub executes the entire sub
+	 * and returning the op *after* the sub (PL_op->op_next)
+	 */
+	op = pp_entersub_orig(aTHX);
+
+	if (op != next_op && prev_cop) { /* have entered a sub */
+
+		/* get line, file, and fid for statement *before* the call */
+		char *file = OutCopFILE(PL_curcop);
+		int line = CopLINE(PL_curcop);
+		unsigned int fid = get_file_id(file, strlen(file), 1);
+		char fid_line_key[50];
+		sprintf(fid_line_key, "%u:%d", fid, line);
+
+		/* get name of sub we've just entered */
+		GV *cvgv = CvGV(cxstack[cxstack_ix].blk_sub.cv);
+		SV *subname_sv = newSV(0);
+
+		if(0)fprintf(stderr, "PL_curcop %p %d %p (op_next %p)\n", cxstack, cxstack_ix, PL_curcop, next_op);
+
+		if (isGV(cvgv)) {
+			gv_efullname3(subname_sv, cvgv, Nullch);
+		}
+		else {
+			warn("unknown blk_sub.cv '%s'",SvPV_nolen((SV*)cvgv));
+			sv_setpvn(subname_sv, "(unknown)",9);
+		}
+		if (trace_level >= 3)
+			fprintf(stderr, "fid %d:%d called %s (%s)\n", fid, line, SvPV_nolen(subname_sv), OP_NAME(op));
+
+		/* { subname => { "fid:line" => count } } */
+		SV *sv = *hv_fetch(sub_callers_hv, SvPV_nolen(subname_sv), SvCUR(subname_sv), 1);
+		if (!SvROK(sv)) /* autoviv */
+			sv_setsv(sv, newRV_noinc((SV*)newHV()));
+		sv = *hv_fetch((HV*)SvRV(sv), fid_line_key, strlen(fid_line_key), 1);
+		sv_inc(sv);
+	}
+	return op;
+}
+
+
 /************************************
  * Shared Reader,NYTProf Functions  *
  ************************************/
@@ -779,6 +852,8 @@ init(pTHX) {
 
 	print_header();
 
+	intercept_opcodes(aTHX);
+
 	/* seed first run time */
 	if (usecputime) {
 		times(&start_ctime);
@@ -839,7 +914,7 @@ store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, double time,
 		av_store(line_av, 0, newSVnv(time));
 		av_store(line_av, 1, newSViv(count));
 	}
-  else {
+	else {
 		line_av = (AV*)SvRV(time_rvav);
 		SV *time_sv = *av_fetch(line_av, 0, 1);
 		sv_setnv(time_sv, time + SvNV(time_sv));
@@ -854,20 +929,21 @@ store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, double time,
 
 void
 write_sub_line_ranges(pTHX, int fids_only) {
-  char *sub_name;
+	char *sub_name;
 	I32 sub_name_len;
-  SV *file_lines_sv;
-  HV *hv = GvHV(PL_DBsub);
+	SV *file_lines_sv;
+	HV *hv = GvHV(PL_DBsub);
 
+	lock_file();
 	hv_iterinit(hv);
-  while (NULL != (file_lines_sv = hv_iternextsv(hv, &sub_name, &sub_name_len))) {
+	while (NULL != (file_lines_sv = hv_iternextsv(hv, &sub_name, &sub_name_len))) {
 		char *file_lines = SvPV_nolen(file_lines_sv); /* "filename:first-last" */
 		char *first = strrchr(file_lines, ':');
 		char *last = (first) ? strchr(first, '-') : NULL;
-	  unsigned int fid;
-	  UV first_line, last_line;
+		unsigned int fid;
+		UV first_line, last_line;
 
-	  if (!first || !last || !grok_number(first+1, last-first-1, &first_line)) {
+		if (!first || !last || !grok_number(first+1, last-first-1, &first_line)) {
 			warn("Can't parse %%DB::sub entry for %s '%s'\n", sub_name, file_lines);
 			continue;
 		} 
@@ -891,8 +967,47 @@ write_sub_line_ranges(pTHX, int fids_only) {
 		output_int(last_line);
 		fputs(sub_name, out);
 		fputc('\n', out);
-  }
+	}
+	unlock_file();
+}
 
+
+void
+write_sub_callers(pTHX) {
+	char *sub_name;
+	I32 sub_name_len;
+	SV *fid_line_rvhv;
+
+	if (!sub_callers_hv)
+		return;
+
+	lock_file();
+	hv_iterinit(sub_callers_hv);
+	while (NULL != (fid_line_rvhv = hv_iternextsv(sub_callers_hv, &sub_name, &sub_name_len))) {
+
+		HV *fid_lines_hv = (HV*)SvRV(fid_line_rvhv);
+		char *fid_line_string;
+		I32 fid_line_len;
+		SV *sv;
+
+		hv_iterinit(fid_lines_hv);
+		while (NULL != (sv = hv_iternextsv(fid_lines_hv, &fid_line_string, &fid_line_len))) {
+			IV count = SvIV(sv);
+			unsigned int fid = 0;
+			unsigned int line = 0;
+			sscanf(fid_line_string, "%u:%u", &fid, &line);
+			if (trace_level >= 3)
+				warn("%s called by %u:%u: count %d\n", sub_name, fid, line, count);
+
+			fputc('c', out);
+			output_int(fid);
+			output_int(line);
+			output_int(count);
+			fputs(sub_name, out);
+			fputc('\n', out);
+		}
+	}
+	unlock_file();
 }
 
 /**
@@ -994,6 +1109,7 @@ load_profile_data_from_stream() {
 	AV* fid_block_time_av = NULL;
 	AV* fid_sub_time_av = NULL;
 	HV* sub_fid_lines_hv = NULL;
+	HV* sub_callers_hv = NULL;
 
 	av_extend(fid_filename_av, 64);  /* grow it up front. */
 
@@ -1104,7 +1220,7 @@ load_profile_data_from_stream() {
 				unsigned int last_line  = read_int();
 				if (NULL == fgets(text, sizeof(text)-1, in))
 					croak("Profile format error in sub line range"); /* probably EOF */
-				if (trace_level >= 2)
+				if (trace_level >= 3)
 				    warn("Sub %.*s fid %u lines %u..%u\n",
 							strlen(text)-1, text, fid, first_line, last_line);
 				if (!sub_fid_lines_hv)
@@ -1118,7 +1234,35 @@ load_profile_data_from_stream() {
 				av_store(av, 1, newSVuv(first_line));
 				av_store(av, 2, newSVuv(last_line));
 				break;
-		  }
+			}
+
+			case 'c':	/* sub callers */
+			{
+				SV *sv;
+				unsigned int fid   = read_int();
+				unsigned int line  = read_int();
+				unsigned int count = read_int();
+				if (NULL == fgets(text, sizeof(text)-1, in))
+					croak("Profile format error in sub line range"); /* probably EOF */
+
+				if (trace_level >= 3)
+				    warn("Sub %.*s called by fid %u line %u: count %d\n",
+							strlen(text)-1, text, fid, line, count);
+
+				if (!sub_callers_hv)
+					sub_callers_hv = newHV();
+				/* { 'pkg::sub' => { "fid:line => count } } */
+				sv = *hv_fetch(sub_callers_hv, text, strlen(text)-1, 1);
+				if (!SvROK(sv))		/* autoviv */
+						sv_setsv(sv, newRV_noinc((SV*)newHV()));
+				/* use "fid:line" for now, may change to "file:line"
+				 * or [ fid, line ] or some other structure that's better suited to
+				 * reporting */
+				sprintf(text, "%u:%u", fid, line);
+				sv = *hv_fetch((HV*)SvRV(sv), text, strlen(text)-1, 1);
+				sv_setuv(sv, count);
+				break;
+			}
 
 			case 'P':
 			{
@@ -1177,6 +1321,8 @@ load_profile_data_from_stream() {
 		hv_store(profile_hv, "fid_sub_time",   12, newRV_noinc((SV*)fid_sub_time_av), 0);
 	if (sub_fid_lines_hv)
 		hv_store(profile_hv, "sub_fid_lines",  13, newRV_noinc((SV*)sub_fid_lines_hv), 0);
+	if (sub_callers_hv)
+		hv_store(profile_hv, "sub_callers",    11, newRV_noinc((SV*)sub_callers_hv), 0);
 	return profile_hv;
 }
 
@@ -1233,10 +1379,15 @@ _finish(...)
 		warn("_finish pid %d\n", getpid());
 	sv_setiv(PL_DBsingle, 0);
 	DB(aTHX); /* write data for final statement */
-	write_sub_line_ranges(aTHX, 0);
 	if (out) {
+		write_sub_line_ranges(aTHX, 0);
+		write_sub_callers(aTHX);
+		if (forkok)
+			lock_file();
 		fputc('p', out); /* mark end of profile data for this pid */
 		output_int(last_pid);
+		if (forkok)
+			unlock_file();
 	}
 
 
