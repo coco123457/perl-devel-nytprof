@@ -16,8 +16,7 @@ use ExtUtils::testlib;
 use Benchmark;
 use Getopt::Long;
 use Config;
-use Test::More tests => 36;
-use_ok('Devel::NYTProf::Reader');
+use Test::More;
 
 # skip these tests when the provided condition is true
 my %SKIP_TESTS = (
@@ -28,7 +27,9 @@ my %SKIP_TESTS = (
 my %opts;
 GetOptions(\%opts, qw/p=s I=s v/);
 
-$ENV{NYTPROF} = ''; # avoid external interference, but see TEST_NYTPROF below
+$ENV{NYTPROF} = ''; # avoid external interference, but see NYTPROF_TEST below
+$| = 1;
+
 my $opt_perl = $opts{p};
 my $opt_include = $opts{I};
 my $outdir = 'profiler';
@@ -36,7 +37,12 @@ my $outdir = 'profiler';
 chdir( 't' ) if -d 't';
 mkdir $outdir or die "mkdir($outdir): $!" unless -d $outdir;
 
+s:^t/:: for @ARGV; # allow args to use t/ prefix
 my @tests = @ARGV ? @ARGV : sort <*.p *.v *.x>;  # glob-sort, for OS/2
+
+plan tests => 3 + @tests;
+
+use_ok('Devel::NYTProf::Reader');
 
 my $path_sep = $Config{path_sep} || ':';
 if( -d '../blib' ){
@@ -67,6 +73,7 @@ can_ok('Devel::NYTProf::Reader', 'process');
 
 $|=1;
 foreach my $test (@tests) {
+
 	#print $test . '.'x (20 - length $test);
 	$test =~ /(\w+)\.(\w)$/;
 	
@@ -107,22 +114,26 @@ sub profile {
 	my $test = shift;
 	
 	my @NYTPROF;
-	push @NYTPROF, $ENV{TEST_NYTPROF} if $ENV{TEST_NYTPROF};
+	push @NYTPROF, $ENV{NYTPROF_TEST} if $ENV{NYTPROF_TEST};
 	push @NYTPROF, "allowfork" if $test eq "test04.p";
 	local $ENV{NYTPROF} = join ":", @NYTPROF;
+	print "NYTPROF=$ENV{NYTPROF}\n" if $opts{v} && $ENV{NYTPROF};
 
 	my $t_start = new Benchmark;
 	my @results = run_command("$perl -d:NYTProf $test");
 	my $t_total = timediff( new Benchmark, $t_start );
-
+	pass($test); # mainly to show progress
 	#print timestr( $t_total, 'nop' ), "\n";
 }
 
 sub verify_result {
 	my $test = shift;
-	no warnings;
-  my $hash = Devel::NYTProf::Reader::process();
-	use warnings;
+	my $hash = eval { Devel::NYTProf::Reader::process() };
+	if ($@) {
+		diag($@);
+		fail($test);
+		return;
+	}
 
   # remove times unless specifically testing times
   foreach my $outer (keys %$hash) {
