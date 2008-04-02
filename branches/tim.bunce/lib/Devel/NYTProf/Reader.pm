@@ -114,14 +114,14 @@ sub _dump_element {
 	no warnings qw(uninitialized);
 	if (ref $value) {
 		if (ref $value eq 'HASH') {
-			_dump_hash_elements($value, $fh, $depth+1);
+			_dump_hash_elements($value, $fh, $depth);
 		}
 		elsif (ref $value eq 'ARRAY') {
 			if (@$value <= 5 && !grep { ref } @$value) {
 				print $fh "[ @$value ]\n";
 			}
 			else {
-				_dump_array_elements($value, $fh, $depth+1);
+				_dump_array_elements($value, $fh, $depth);
 			}
 		}
 		else {
@@ -135,27 +135,29 @@ sub _dump_element {
 
 sub _dump_hash_elements {
 	my ($hash, $fh, $depth) = @_;
-	my $pad = "  " x $depth;
+	my $pad = "    ";
+	my $padN = $pad x $depth;
 	print $fh "{\n";
 	for my $key (sort keys %$hash) {
 		my $value = $hash->{$key};
-		print $fh "$pad  $key => ";
+		print $fh "$padN$key => ";
 		_dump_element($value, $fh, $depth+1);
 	}
-	print $fh "$pad}\n";
+	printf $fh "%s}\n", ($pad x ($depth-1));
 }
 
 sub _dump_array_elements {
 	my ($array, $fh, $depth) = @_;
-	my $pad = "  " x $depth;
+	my $pad = "    ";
+	my $padN = $pad x $depth;
 	print $fh "[\n";
 	for my $key (0..@$array-1) {
 		my $value = $array->[$key];
 		next unless defined $value;
-		print $fh "$pad  $key: ";
+		printf $fh "%s%s: ", $pad x ($depth), $key;
 		_dump_element($value, $fh, $depth+1);
 	}
-	print $fh "$pad]\n";
+	printf $fh "%s]\n", ($pad x ($depth-1));
 }
 
 
@@ -164,7 +166,7 @@ sub process {
 	# convert into old-style data structure
 	my $dump = 0;
 	require Data::Dumper if $dump;
-	dump_profile_data($data, 1) if $dump;
+	dump_profile_data($data, 1) if $dump or 1;
 	warn Data::Dumper::Dumper($data) if $dump;
 
 	my $fid_filename  = $data->{fid_filename};

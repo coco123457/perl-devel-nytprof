@@ -1272,7 +1272,7 @@ load_profile_data_from_stream() {
 				 * or [ fid, line ] or some other structure that's better suited to
 				 * reporting */
 				sprintf(text, "%u:%u", fid, line);
-				sv = *hv_fetch((HV*)SvRV(sv), text, strlen(text)-1, 1);
+				sv = *hv_fetch((HV*)SvRV(sv), text, strlen(text), 1);
 				sv_setuv(sv, count);
 				break;
 			}
