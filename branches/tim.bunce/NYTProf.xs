@@ -1264,15 +1264,19 @@ load_profile_data_from_stream() {
 
 				if (!sub_callers_hv)
 					sub_callers_hv = newHV();
-				/* { 'pkg::sub' => { "fid:line => count } } */
+				/* { 'pkg::sub' => { fid => { line => count } } } */
 				sv = *hv_fetch(sub_callers_hv, text, strlen(text)-1, 1);
 				if (!SvROK(sv))		/* autoviv */
 						sv_setsv(sv, newRV_noinc((SV*)newHV()));
-				/* use "fid:line" for now, may change to "file:line"
-				 * or [ fid, line ] or some other structure that's better suited to
-				 * reporting */
-				sprintf(text, "%u:%u", fid, line);
+
+				sprintf(text, "%u", fid);
 				sv = *hv_fetch((HV*)SvRV(sv), text, strlen(text), 1);
+				if (!SvROK(sv)) /* autoviv */
+					sv_setsv(sv, newRV_noinc((SV*)newHV()));
+
+				sprintf(text, "%u", line);
+				sv = *hv_fetch((HV*)SvRV(sv), text, strlen(text), 1);
+
 				sv_setuv(sv, count);
 				break;
 			}
@@ -1341,7 +1345,7 @@ load_profile_data_from_stream() {
 	sv_free((SV*)live_pids_hv);
 
 	profile_hv = newHV();
-	hv_store(profile_hv, "attr",            4, newRV_noinc((SV*)attr_hv), 0);
+	hv_store(profile_hv, "attribute",       9, newRV_noinc((SV*)attr_hv), 0);
 	hv_store(profile_hv, "fid_filename",   12, newRV_noinc((SV*)fid_filename_av), 0);
 	hv_store(profile_hv, "fid_line_time",  13, newRV_noinc((SV*)fid_line_time_av), 0);
 	if (fid_block_time_av)
@@ -1349,9 +1353,9 @@ load_profile_data_from_stream() {
 	if (fid_sub_time_av)
 		hv_store(profile_hv, "fid_sub_time",   12, newRV_noinc((SV*)fid_sub_time_av), 0);
 	if (sub_fid_lines_hv)
-		hv_store(profile_hv, "sub_fid_lines",  13, newRV_noinc((SV*)sub_fid_lines_hv), 0);
+		hv_store(profile_hv, "sub_fid_line",   12, newRV_noinc((SV*)sub_fid_lines_hv), 0);
 	if (sub_callers_hv)
-		hv_store(profile_hv, "sub_callers",    11, newRV_noinc((SV*)sub_callers_hv), 0);
+		hv_store(profile_hv, "sub_caller",     10, newRV_noinc((SV*)sub_callers_hv), 0);
 	return profile_hv;
 }
 
