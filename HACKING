@@ -161,3 +161,8 @@ Overriding pp_leavesub may allow more accurate measurements by avoiding return
 value processing overheads accumulating on last statement in sub.
 
 fork statement gets counted twice currently. set elapsed=0 if pid changes
+
+Add way for program being profiled to switch output to a new profile file.
+See http://search.cpan.org/dist/Devel-Profile/ for use case.
+
+
