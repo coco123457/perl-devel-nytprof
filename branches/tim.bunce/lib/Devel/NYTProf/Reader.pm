@@ -91,8 +91,8 @@ sub new {
 	}
 
 	bless($self, $class);
-	$self->{data} = process($self->{file});
-	$self->{profile_db_time} = getDatabaseTime();
+	$self->{profile} = Devel::NYTProf::Data->new( { filename => $self->{file} } );
+	$self->{data} = _map_new_to_old($self->{profile});
 	return $self;
 }
 
@@ -100,6 +100,11 @@ sub new {
 sub process {
 	my $filename = shift;
 	my $data = Devel::NYTProf::Data->new( { filename => $filename } );
+	return _map_new_to_old($data);
+}
+
+sub _map_new_to_old {
+	my $data = shift;
 	# convert into old-style data structure
 	my $dump = 0;
 	require Data::Dumper if $dump;
@@ -211,7 +216,7 @@ sub _test_file {
 		carp "Unable to locate source file: $file\n";
 		return 0; 
 	}
-	return 1 if (stat $file)[9] > $self->{profile_db_time};
+	return 1 if (stat $file)[9] > $self->{profile}{attribute}{basetime};
 	0;
 }
 
@@ -655,16 +660,7 @@ returns them as a list.
 If you need to create a static file in the output directory, you can use this
 subroutine.  It is currently used to dump the CSS file into the html output
 
-=item $reporter->getDatabaseTime(  );
-
-Implemented in XS.  This function returns the time that the NYTProf database 
-was created. You should not need to use this.
-
 =back
-
-=head1 BUGS
-
-Windows support. I have no idea if it will work, but the profiler will NOT.
 
 =head1 EXPORT
 
@@ -672,16 +668,15 @@ None by default. Object Oriented.
 
 =head1 SEE ALSO
 
+See also L<Devel::NYTProf>.
+
 Mailing list and discussion at L<http://groups.google.com/group/develnytprof-dev>
 
 Public SVN Repository and hacking instructions at L<http://code.google.com/p/perl-devel-nytprof/>
 
-Take a look at the scripts which implement this module, L<nytprofhtml> and
+Take a look at the scripts which use this module, L<nytprofhtml> and
 L<nytprofcsv>.  They are probably all that you will need and provide an
 excellent jumping point into writing your own custom reports.
-
-You'll need to install and run L<Devel::NYTProf> before you can use anything 
-that implements this module... but this is easy (see L<"SYNOPSIS">)
 
 =head1 AUTHOR
 

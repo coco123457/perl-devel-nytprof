@@ -115,7 +115,6 @@ void open_file(bool);
 void init_runtime();
 void init(pTHX);
 void DEBUG_print_stats(pTHX);
-IV   getTicksPerSec();
 HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
 															double time, int count);
@@ -1014,22 +1013,6 @@ write_sub_callers(pTHX) {
 	unlock_file();
 }
 
-/**
- * Returns the time that the database was generated.
- * TODO Implement this properly. It was borked due to time constraints
- */
-IV
-getDatabaseTime() {
-	return time(NULL);
-}
-
-/**
- * Return the clocks per second as parsed by process(). 1 if not set!
- */
-IV
-getTicksPerSec() {
-	return ticks_per_sec;
-}
 
 /**
  * Read an integer, up to 4 bytes stored in binary
@@ -1453,11 +1436,4 @@ load_profile_data_from_file(file=NULL)
 	OUTPUT:
 	RETVAL
 
-MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Reader
-PROTOTYPES: DISABLE 
 
-IV
-getDatabaseTime()
-
-IV
-getTicksPerSec()
