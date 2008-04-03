@@ -42,7 +42,7 @@ chdir( 't' ) if -d 't';
 mkdir $outdir or die "mkdir($outdir): $!" unless -d $outdir;
 
 s:^t/:: for @ARGV; # allow args to use t/ prefix
-my @tests = @ARGV ? @ARGV : sort <*.p *.v *.x>;  # glob-sort, for OS/2
+my @tests = @ARGV ? @ARGV : sort <*.p *.v *.w *.x>;  # glob-sort, for OS/2
 
 plan tests => 1 + number_of_tests(@tests);
 
@@ -77,22 +77,28 @@ foreach my $test (@tests) {
 
 	#print $test . '.'x (20 - length $test);
 	$test =~ /(\w+)\.(\w)$/;
-	
+
+	SKIP: {
+
 		if ($2 eq 'p') {
 			profile($test);
-		} elsif($2 eq 'v') {
-			SKIP: {
-        skip "Tests incompatible with your perl version", 1, 
-              if $SKIP_TESTS{$1};
-        verify_result($test);
-      }
-		} elsif($2 eq 'x') {
-			SKIP: {
-        skip "Tests incompatible with your perl version", 2, 
-              if $SKIP_TESTS{$1};
-        verify_report($test);
-		  }
 		}
+		elsif ($2 eq 'v') {
+			skip "Tests incompatible with your perl version", 1, 
+						if $SKIP_TESTS{$1};
+			verify_old_data($test);
+		}
+		elsif ($2 eq 'w') {
+			skip "Tests incompatible with your perl version", 1, 
+						if $SKIP_TESTS{$1};
+			verify_data($test);
+		}
+		elsif ($2 eq 'x') {
+			skip "Tests incompatible with your perl version", 2, 
+						if $SKIP_TESTS{$1};
+			verify_report($test);
+		}
+	}
 }
 
 exit 0;
@@ -127,7 +133,8 @@ sub profile {
 	#print timestr( $t_total, 'nop' ), "\n";
 }
 
-sub verify_result {
+
+sub verify_old_data {
 	my $test = shift;
 	my $hash = eval { Devel::NYTProf::Reader::process('nytprof.out') };
 	if ($@) {
@@ -142,14 +149,36 @@ sub verify_result {
 	}
 
 	my $expected;
-	{
-		local $/ = undef;
-		open(TEST, $test) or die "Unable to open test $test: $!\n";
-		my $contents = <TEST>; #slurp
-		close TEST;
-		eval $contents;
-	}
+	eval scalar slurp_file($test);
 	is_deeply($hash, $expected, $test);
+}
+
+
+sub verify_data {
+	my $test = shift;
+
+	my $profile = eval { Devel::NYTProf::Data->new( { filename => 'nytprof.out' }) };
+	if ($@) {
+		diag($@);
+		fail($test);
+		return;
+	}
+
+	$profile->normalize_variables;
+
+	my $expected = eval scalar slurp_file($test);
+
+	is_deeply($profile, $expected, $test)
+		or dump_data_to_file($profile, "$test.new");
+}
+
+sub dump_data_to_file {
+	my ($data, $file) = @_;
+	require Data::Dumper;
+	open my $fh, ">", $file or die "Can't open $file: $!\n";
+  my $d = Data::Dumper->new([$data], ['foo']);
+  print $fh $d->Terse(1)->Useqq(1)->Indent(1)->Sortkeys(1)->Dump;
+	return;
 }
 
 sub verify_report {
@@ -167,13 +196,8 @@ sub verify_report {
     $infile .= "p.";
   }
   }
-	open(IN, "$outdir/${infile}csv") or die "Can't open test file: $outdir/${infile}csv";
-	my @got = <IN>;
-	close IN;
-
-	open(EXP, $test) or die "Unable to open testing file t/$test\n";
-	my @expected = <EXP>;
-	close EXP;
+	my @got      = slurp_file("$outdir/${infile}csv");
+	my @expected = slurp_file($test);
 
 	if ($opts{v}) {
 		print "GOT:\n";
@@ -241,9 +265,19 @@ sub number_of_tests {
 	my $tests = 0;
 	for (@_) {
 		next unless m/\.(.)$/;
-		$tests += { p => 1, v => 1, x => 2 }->{$1};
+		$tests += { p => 1, v => 1, w => 1, x => 2 }->{$1};
 	}
 	return $tests;
 }
+
+
+sub slurp_file { # individual lines in list context, entire file in scalar context
+	my ($file) = @_;
+	open my $fh, "<", $file or die "Can't open $file: $!\n";
+	return <$fh> if wantarray;
+	local $/ = undef; # slurp;
+	return <$fh>;
+}
+
 
 # vim:ts=2:sw=2

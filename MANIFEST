@@ -15,6 +15,7 @@ t/90.pod.t
 t/91.pod_coverage.t
 t/test01.p
 t/test01.v
+t/test01.w
 t/test01.x
 t/test02.p
 t/test02.v
