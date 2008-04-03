@@ -13,7 +13,7 @@ use Carp;
 use Getopt::Long;
 use Devel::NYTProf::Reader;
 
-our $VERSION = 1.01;
+our $VERSION = 1.02;
 
 use constant NUMERIC_PRECISION    => 5;
 
@@ -51,10 +51,10 @@ print "Generating CSV report...\n";
 my $reporter = new Devel::NYTProf::Reader($opt{file});
 
 # place to store this
-$reporter->outputDir($opt{out});
+$reporter->output_dir($opt{out});
 
 # set output options
-$reporter->addRegexp('^\s*', ''); # trim leading spaces
+$reporter->add_regexp('^\s*', ''); # trim leading spaces
 
 # generate the files
 $reporter->report();

@@ -150,7 +150,7 @@ sub _line_array_to_line_hash {
 
 
 ##
-sub setParam {
+sub set_param {
 	my ($self, $param, $value) = @_;
 
 	if ($param eq 'linestart') {
@@ -176,7 +176,7 @@ sub setParam {
 }
 
 ##
-sub addRegexp {
+sub add_regexp {
 	my ($self, $pattern, $replace) = @_;
 	push (@{$self->{user_regexp}}, {pattern => $pattern, replace => $replace});
 }
@@ -185,7 +185,7 @@ sub addRegexp {
 # NOT USED.  This will work very well in code that is normalized (i.e. the same
 # time is spent in every file) but is fairly useless in practice...
 # use it if you want.
-sub calculate_sd {
+sub calculate_standard_deviation {
 	my $stats = shift;
 	$stats = [sort {$a <=> $b} @$stats];
 
@@ -230,13 +230,13 @@ sub _output_additional {
 }
 
 ##
-sub getFileStats {
+sub get_file_stats {
 	my $self = shift;
 	return $self->{filestats};
 }
 
 ##
-sub outputDir {
+sub output_dir {
 	my ($self, $dir) = @_;
 	return $self->{output_dir} unless defined($dir);
 	if (!mkdir $dir) {
@@ -445,10 +445,10 @@ Devel::NYTProf::Reader - Tranforms L<Devel::NYTProf> output into comprehensive, 
  my $reporter = new Devel::NYTProf::Reader('nytprof.out');
 
  # place to store the output
- $reporter->outputDir($file);
+ $reporter->output_dir($file);
 
  # set other options and parameters
- $reporter->addRegexp('^\s*', ''); # trim leading spaces
+ $reporter->add_regexp('^\s*', ''); # trim leading spaces
 
  # generate the report
  $reporter->report();
@@ -528,22 +528,22 @@ C<Devel::NYTProf::Reader>.  The following methods are provided:
 
 =over 4
 
-=item $reporter->outputDir( $output_directory );
+=item $reporter->output_dir( $output_directory );
 
 Set the directory that generated files should be placed in. [Default: .]
 
-=item $reporter->addRegexp( $pattern, $replace );
+=item $reporter->add_regexp( $pattern, $replace );
 
 Add a regular expression to the top of the pattern stack.  Ever line of output 
 will be run through each entry in the pattern stack.  
 
 For example, to replace spaces, < and > with html entities, you might do:
 
-	$reporter->addRegexp(' ', '&nbsp;');
-	$reporter->addRegexp('<', '&lt;');
-	$reporter->addRegexp('>', '&gt;');
+	$reporter->add_regexp(' ', '&nbsp;');
+	$reporter->add_regexp('<', '&lt;');
+	$reporter->add_regexp('>', '&gt;');
 
-=item $reporter->setParam( $parameter, $value );
+=item $reporter->set_param( $parameter, $value );
 
 Changes the internal value of $parameter to $value.  If $value is omitted, 
 returns the current value of parameter.
@@ -636,7 +636,7 @@ Trigger data processing and report generation. This method will die with
 a message if it fails.  The return value is not defined.  This is where all of
 the work is done.
 
-=item $reporter->getFileStats( );
+=item $reporter->get_file_stats( );
 
 When called after calling C<$reporter-E<gt>report()>, will return a hash containing the cumulative totals for each file.
 
@@ -645,7 +645,7 @@ When called after calling C<$reporter-E<gt>report()>, will return a hash contain
 
 Fields are time, calls, time/call, html-safe.
 
-=item Devel::NYTProf::Reader::calculate_sd( @stats );
+=item Devel::NYTProf::Reader::calculate_standard_deviation( @stats );
 
 Calculates the standard deviation and mean of the values in @stats, returns 
 them as a list.
@@ -658,7 +658,7 @@ returns them as a list.
 =item $reporter->_output_additional( $file, @data );
 
 If you need to create a static file in the output directory, you can use this
-subroutine.  It is currently used to dump the CSS file into the html output
+subroutine.  It is currently used to dump the CSS file into the html output.
 
 =back
 

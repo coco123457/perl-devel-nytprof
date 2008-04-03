@@ -438,7 +438,8 @@ start_cop_of_context(pTHX_ PERL_CONTEXT *cx) {
     }
     if (!start_op) {
         if (trace_level >= 4)
-            warn("\tstart_cop_of_context: can't find start of %s\n", block_type[CxTYPE(cx)]);
+            warn("\tstart_cop_of_context: can't find start of %s\n", 
+            			block_type[CxTYPE(cx)]);
         return NULL;
     }
     /* find next cop from OP */
@@ -447,12 +448,14 @@ start_cop_of_context(pTHX_ PERL_CONTEXT *cx) {
         if (type == OP_NEXTSTATE || type == OP_SETSTATE || type == OP_DBSTATE) {
 				  if (trace_level >= 4)
 						warn("\tstart_cop_of_context %s is %s line %d of %s\n",
-							block_type[CxTYPE(cx)], OP_NAME(o), CopLINE((COP*)o), OutCopFILE((COP*)o));
+							block_type[CxTYPE(cx)], OP_NAME(o), CopLINE((COP*)o), 
+							OutCopFILE((COP*)o));
 					return (COP*)o;
 				}
         /* should never get here? */
         if (1 || trace_level)
-            warn("\tstart_cop_of_context %s op '%s' isn't a cop", block_type[CxTYPE(cx)], OP_NAME(o));
+            warn("\tstart_cop_of_context %s op '%s' isn't a cop", 
+            			block_type[CxTYPE(cx)], OP_NAME(o));
         if (trace_level >= 4)
             do_op_dump(1, PerlIO_stderr(), o);
         o = o->op_next;
@@ -466,7 +469,9 @@ start_cop_of_context(pTHX_ PERL_CONTEXT *cx) {
 }
 
 static PERL_CONTEXT *
-visit_contexts(pTHX_ UV stop_at, int (*callback)(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)) {
+visit_contexts(pTHX_ UV stop_at, int (*callback)(pTHX_ PERL_CONTEXT *cx, 
+								UV *stop_at_ptr)) 
+{
     dSP;
     /* modelled on pp_caller() in pp_ctl.c */
     register I32 cxix = cxstack_ix;
@@ -477,14 +482,14 @@ visit_contexts(pTHX_ UV stop_at, int (*callback)(pTHX_ PERL_CONTEXT *cx, UV *sto
     if (trace_level >= 4)
         warn("visit_contexts: \n");
 
-    for (;;) {
+    while (1) {
         /* we may be in a higher stacklevel, so dig down deeper */
 				/* XXX so we'll miss code in sort blocks and signals?		*/
 				/* callback should perhaps be moved to dopopcx_at */
         while (cxix < 0 && top_si->si_type != PERLSI_MAIN) {
             if (trace_level >= 3)
-							warn("not on main stack (type %d) so digging top_si %p->%p, ccstack %p->%p\n",
-                top_si, top_si->si_prev, ccstack, top_si->si_cxstack);
+							warn("Not on main stack (type %d); digging top_si %p->%p, ccstack %p->%p\n",
+										top_si, top_si->si_prev, ccstack, top_si->si_cxstack);
             top_si  = top_si->si_prev;
             ccstack = top_si->si_cxstack;
             cxix = dopopcx_at(aTHX_ ccstack, top_si->si_cxix, stop_at);
@@ -552,7 +557,8 @@ _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 		}
 		/* shouldn't happen! */
 		if (trace_level >= 3)
-			warn("%s in different file (%s, %s)", block_type[CxTYPE(cx)], OutCopFILE(near_cop), OutCopFILE(PL_curcop));
+			warn("%s in different file (%s, %s)", block_type[CxTYPE(cx)], 
+						OutCopFILE(near_cop), OutCopFILE(PL_curcop));
 		return 1; /* stop looking */
 	}
 	last_block_line = CopLINE(near_cop);
@@ -616,9 +622,8 @@ DB(pTHX) {
 			output_int(last_sub_line);
 		}
 		if (trace_level >= 3)
-			warn("Wrote %d:%-4d %2u ticks (%u, %u)\n",
-				last_executed_file, last_executed_line, elapsed, last_block_line, 
-				last_sub_line);
+			warn("Wrote %d:%-4d %2u ticks (%u, %u)\n", last_executed_file, 
+						last_executed_line, elapsed, last_block_line, last_sub_line);
 
 		if (forkok) {
 			unlock_file();
@@ -635,7 +640,9 @@ DB(pTHX) {
 
   if (profile_blocks) {
 		if (trace_level >= 4)
-			warn("\tlooking for block and sub lines for %u:%u\n", last_executed_file, last_executed_line);
+			warn("\tlooking for block and sub lines for %u:%u\n", last_executed_file, 
+						last_executed_line);
+
 		last_block_line = 0;
 		last_sub_line   = 0;
 		visit_contexts(aTHX_ ~0, &_check_context);
@@ -713,6 +720,7 @@ open_file(bool forked) {
 	}
 	if (trace_level)
 			warn("Opening %s (%s)\n", (filename) ? filename : "STDOUT", mode);
+
 	out = (filename) ? fopen(filename, mode) : fdopen(fd, mode);
 }
 
@@ -758,7 +766,8 @@ pp_entersub_profiler(pTHX) {
 		GV *cvgv = CvGV(cxstack[cxstack_ix].blk_sub.cv);
 		SV *subname_sv = newSV(0);
 
-		if(0)fprintf(stderr, "PL_curcop %p %d %p (op_next %p)\n", cxstack, cxstack_ix, PL_curcop, next_op);
+		if (0) fprintf(stderr, "PL_curcop %p %d %p (op_next %p)\n", cxstack, 
+										cxstack_ix, PL_curcop, next_op);
 
 		if (isGV(cvgv)) {
 			gv_efullname3(subname_sv, cvgv, Nullch);
@@ -768,10 +777,12 @@ pp_entersub_profiler(pTHX) {
 			sv_setpvn(subname_sv, "(unknown)",9);
 		}
 		if (trace_level >= 3)
-			fprintf(stderr, "fid %d:%d called %s (%s)\n", fid, line, SvPV_nolen(subname_sv), OP_NAME(op));
+			fprintf(stderr, "fid %d:%d called %s (%s)\n", fid, line, 
+							SvPV_nolen(subname_sv), OP_NAME(op));
 
 		/* { subname => { "fid:line" => count } } */
-		SV *sv = *hv_fetch(sub_callers_hv, SvPV_nolen(subname_sv), SvCUR(subname_sv), 1);
+		SV *sv = *hv_fetch(sub_callers_hv, SvPV_nolen(subname_sv), 
+												SvCUR(subname_sv), 1);
 		if (!SvROK(sv)) /* autoviv */
 			sv_setsv(sv, newRV_noinc((SV*)newHV()));
 		sv = *hv_fetch((HV*)SvRV(sv), fid_line_key, strlen(fid_line_key), 1);
@@ -810,7 +821,9 @@ init_runtime(const char* file) {
 		}
 	}
 
-	/* a file name passed to load_profile_data_from_file(...) has the highest priority */
+	/* a file name passed to load_profile_data_from_file(...) has the highest 
+	 * priority
+	 */
 	if (NULL != file) {
 		READER_use_stdin = 0;
 		PROF_use_stdout = 0;
@@ -843,8 +856,9 @@ init_profiler(pTHX) {
 	}
 
 	/* create file id mapping hash */
-	hashtable.table = (Hash_entry**)safemalloc(sizeof(Hash_entry*) * hashtable.size);
-	memset(hashtable.table, 0, sizeof(Hash_entry*) * hashtable.size);
+	unsigned int hashtable_memwidth = sizeof(Hash_entry*) * hashtable.size;
+	hashtable.table = (Hash_entry**)safemalloc(hashtable_memwidth);
+	memset(hashtable.table, 0, hashtable_memwidth);
 	
 	init_runtime(NULL);
 
@@ -939,7 +953,8 @@ write_sub_line_ranges(pTHX, int fids_only) {
 
 	lock_file();
 	hv_iterinit(hv);
-	while (NULL != (file_lines_sv = hv_iternextsv(hv, &sub_name, &sub_name_len))) {
+	while (NULL != (file_lines_sv = hv_iternextsv(hv, &sub_name, &sub_name_len))) 
+	{
 		char *file_lines = SvPV_nolen(file_lines_sv); /* "filename:first-last" */
 		char *first = strrchr(file_lines, ':');
 		char *last = (first) ? strchr(first, '-') : NULL;
@@ -962,7 +977,8 @@ write_sub_line_ranges(pTHX, int fids_only) {
 			continue;
 
 		if (trace_level >= 2)
-			warn("Sub %s fid %u lines %u..%u\n", sub_name, fid, first_line, last_line);
+			warn("Sub %s fid %u lines %u..%u\n", sub_name, fid, first_line, 
+																					last_line);
 
 		fputc('s', out);
 		output_int(fid);
@@ -986,15 +1002,18 @@ write_sub_callers(pTHX) {
 
 	lock_file();
 	hv_iterinit(sub_callers_hv);
-	while (NULL != (fid_line_rvhv = hv_iternextsv(sub_callers_hv, &sub_name, &sub_name_len))) {
-
+	while (NULL != (fid_line_rvhv = hv_iternextsv(sub_callers_hv, &sub_name, 
+									&sub_name_len))) 
+	{
 		HV *fid_lines_hv = (HV*)SvRV(fid_line_rvhv);
 		char *fid_line_string;
 		I32 fid_line_len;
 		SV *sv;
 
 		hv_iterinit(fid_lines_hv);
-		while (NULL != (sv = hv_iternextsv(fid_lines_hv, &fid_line_string, &fid_line_len))) {
+		while (NULL != (sv = hv_iternextsv(fid_lines_hv, &fid_line_string,
+										&fid_line_len))) 
+		{
 			IV count = SvIV(sv);
 			unsigned int fid = 0;
 			unsigned int line = 0;
@@ -1015,7 +1034,8 @@ write_sub_callers(pTHX) {
 
 
 /**
- * Read an integer, up to 4 bytes stored in binary
+ * Read an integer by decompressing the next 1 to 4 bytes of binary into a 32-
+ * bit integer. See output_int() for the compression details.
  */
 unsigned int
 read_int() {
@@ -1176,7 +1196,8 @@ load_profile_data_from_stream() {
 				eval_line_num = read_int();
 
 				if (NULL == fgets(text, sizeof(text), in))
-					croak("Profile format error while reading fid declaration"); /* probably EOF */
+					/* probably EOF */
+					croak("Profile format error while reading fid declaration"); 
 				if (trace_level) {
 						if (eval_file_num)
 							warn("Fid %2u is %.*s (eval fid %u line %u)\n",
@@ -1187,7 +1208,8 @@ load_profile_data_from_stream() {
 				}
 
 				if (av_exists(fid_filename_av, file_num)
-				&& strnNE(SvPV_nolen(AvARRAY(fid_filename_av)[file_num]), text, strlen(text)-1)
+						&& strnNE(SvPV_nolen(AvARRAY(fid_filename_av)[file_num]), text, 
+											strlen(text)-1)
 				) {
 					warn("File id %d redefined from %s to %s", file_num,
 								SvPV_nolen(AvARRAY(fid_filename_av)[file_num]), text);
@@ -1195,7 +1217,9 @@ load_profile_data_from_stream() {
 
 				fid_info_sv = newSVpvn(text, strlen(text)-1); /* drop newline */
 				if (eval_line_num) {
-					/* change fid_info_sv to ref to array of [ name, eval_file_num, eval_line_num ] */
+					/* change fid_info_sv to ref to array of 
+					 * [ name, eval_file_num, eval_line_num ] 
+					 */
 					AV *av = newAV();
 					av_store(av, 0, fid_info_sv);
 					av_store(av, 1, newSVuv(eval_file_num));
@@ -1282,9 +1306,11 @@ load_profile_data_from_stream() {
 				unsigned int pid = read_int();
 				sprintf(text, "%d", pid);
 				if (!hv_delete(live_pids_hv, text, strlen(text), 0))
-					warn("inconsistent pids in profile data (pid %d not introduced)", pid);
+					warn("Inconsistent pids in profile data (pid %d not introduced)", 
+								pid);
 				if (trace_level)
-					warn("End of profile data for pid %s, %d remaining\n", text, HvKEYS(live_pids_hv));
+					warn("End of profile data for pid %s, %d remaining\n", text, 
+								HvKEYS(live_pids_hv));
 				break;
 			}
 
@@ -1323,22 +1349,29 @@ load_profile_data_from_stream() {
 	}
 
 	if (EOF == c && HvKEYS(live_pids_hv)) {
-		warn("profile data possibly truncated, no terminator for %d pids", HvKEYS(live_pids_hv));
+		warn("profile data possibly truncated, no terminator for %d pids", 
+					HvKEYS(live_pids_hv));
 	}
 	sv_free((SV*)live_pids_hv);
 
 	profile_hv = newHV();
 	hv_store(profile_hv, "attribute",       9, newRV_noinc((SV*)attr_hv), 0);
-	hv_store(profile_hv, "fid_filename",   12, newRV_noinc((SV*)fid_filename_av), 0);
-	hv_store(profile_hv, "fid_line_time",  13, newRV_noinc((SV*)fid_line_time_av), 0);
+	hv_store(profile_hv, "fid_filename",   12, 
+						newRV_noinc((SV*)fid_filename_av), 0);
+	hv_store(profile_hv, "fid_line_time",  13, 
+						newRV_noinc((SV*)fid_line_time_av), 0);
 	if (fid_block_time_av)
-		hv_store(profile_hv, "fid_block_time", 14, newRV_noinc((SV*)fid_block_time_av), 0);
+		hv_store(profile_hv, "fid_block_time", 14, 
+							newRV_noinc((SV*)fid_block_time_av), 0);
 	if (fid_sub_time_av)
-		hv_store(profile_hv, "fid_sub_time",   12, newRV_noinc((SV*)fid_sub_time_av), 0);
+		hv_store(profile_hv, "fid_sub_time",   12, 
+							newRV_noinc((SV*)fid_sub_time_av), 0);
 	if (sub_fid_lines_hv)
-		hv_store(profile_hv, "sub_fid_line",   12, newRV_noinc((SV*)sub_fid_lines_hv), 0);
+		hv_store(profile_hv, "sub_fid_line",   12, 
+							newRV_noinc((SV*)sub_fid_lines_hv), 0);
 	if (sub_callers_hv)
-		hv_store(profile_hv, "sub_caller",     10, newRV_noinc((SV*)sub_callers_hv), 0);
+		hv_store(profile_hv, "sub_caller",     10, 
+							newRV_noinc((SV*)sub_callers_hv), 0);
 	return profile_hv;
 }
 

@@ -10,6 +10,7 @@ bin/nytprofhtml
 lib/Devel/NYTProf.pm
 lib/Devel/NYTProf/Core.pm
 lib/Devel/NYTProf/Reader.pm
+lib/Devel/NYTProf/Data.pm
 ppport.h
 t/90.pod.t
 t/91.pod_coverage.t

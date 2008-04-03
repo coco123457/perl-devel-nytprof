@@ -2,6 +2,11 @@
 # $Id$
 Revision history for Perl extension Devel::NYTProf.
 
+1.50  ? ? ? 0:00:00 2008
+	- Major revision to include Tim Bunce's call scope statistics features,
+			code/doc refactoring, optimizations and bug fixes.
+	- Fixes major issues with profiling code that forks.
+
 1.13	Wed Mar 26 9:35:00 2008
 	- Fixed RedHat EL bug - %f isn't the C format for floating-point for RHEL
 			Changed Reader.pm to warn-and-continue instead of dieing when a source 
