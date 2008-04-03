@@ -12,11 +12,15 @@
 ###########################################################
 use warnings;
 use strict;
+
 use ExtUtils::testlib;
 use Benchmark;
 use Getopt::Long;
 use Config;
 use Test::More;
+
+use Devel::NYTProf::Reader;
+
 
 # skip these tests when the provided condition is true
 my %SKIP_TESTS = (
@@ -40,9 +44,7 @@ mkdir $outdir or die "mkdir($outdir): $!" unless -d $outdir;
 s:^t/:: for @ARGV; # allow args to use t/ prefix
 my @tests = @ARGV ? @ARGV : sort <*.p *.v *.x>;  # glob-sort, for OS/2
 
-plan tests => 3 + number_of_tests(@tests);
-
-use_ok('Devel::NYTProf::Reader');
+plan tests => 1 + number_of_tests(@tests);
 
 my $path_sep = $Config{path_sep} || ':';
 if( -d '../blib' ){
@@ -69,7 +71,6 @@ if( $perl =~ m|^\./| ) {
 #ok(-f $perl, "Where's Perl?");
 ok(-x $fprofcsv, "Where's fprofcsv?");
 
-can_ok('Devel::NYTProf::Reader', 'process');
 
 $|=1;
 foreach my $test (@tests) {
