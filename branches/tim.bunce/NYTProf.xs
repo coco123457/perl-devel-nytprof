@@ -582,14 +582,12 @@ DB(pTHX) {
 	} else {
 #ifdef _HAS_GETTIMEOFDAY
 		gettimeofday(&end_time, NULL);
-		elapsed = (end_time.tv_sec - start_time.tv_sec) * 1000000;
-		elapsed += end_time.tv_usec - start_time.tv_usec;
+		elapsed = (end_time.tv_sec - start_time.tv_sec) * 1000000
+						+ end_time.tv_usec - start_time.tv_usec;
 #else
 		(*u2time)(aTHX_ end_utime);
-		if (end_utime[0] < start_utime[0] + 2000) {
-				elapsed = (end_utime[0] - start_utime[0]) * 1000000 + 
-										end_utime[1] - start_utime[1];
-		}
+		elapsed = (end_utime[0] - start_utime[0]) * 1000000
+						+ end_utime[1] - start_utime[1];
 #endif
 	}
 
