@@ -20,9 +20,7 @@ BEGIN {
 	$^P=0x1;    # on
 	$^P=0x0;    # then back off again for now, see below
 
-	require Devel::NYTProf::ModuleVersion;
-	require XSLoader;
-	XSLoader::load('Devel::NYTProf', $Devel::NYTProf::ModuleVersion::VERSION);
+	require Devel::NYTProf::Core; # loads XS
 
 	if ($] < 5.008008) {	# workaround bug in old perl versions (slow)
 		local $^W = 0;
@@ -30,7 +28,7 @@ BEGIN {
 		*DB = sub { goto &_DB }
 	}
 
-	init();
+	init_profiler();
 
 	# enable debugging - see perlvar docs
 	$^P=  0x002 # Line-by-line debugging (call DB::DB() per statement)
