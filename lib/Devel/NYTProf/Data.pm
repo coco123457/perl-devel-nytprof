@@ -45,7 +45,8 @@ sub new {
 
 	croak "No file specified (@{[ %$args ]})" unless $args->{filename};
 
-	my $profile = Devel::NYTProf::Data::load_profile_data_from_file($args->{filename});
+	my $profile = Devel::NYTProf::Data::load_profile_data_from_file(
+									$args->{filename});
 	bless $profile => $class;
 
 	return $profile;
