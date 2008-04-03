@@ -169,6 +169,10 @@ WriteMakefile(
 # add some extra utility targets to the make file
 sub MY::post_constants {
     q{
+svnmanifest::
+	svn list -R .@HEAD | sort | grep -v '/$$' > MANIFEST
+	svn diff MANIFEST
+
 checkkeywords:
 	$(RM_RF) blib
 	find .  \( -name .svn -prune -or -name t -prune -or -name \*.pm -or -name \*.PL -or -name \*.pl \) -type f \
