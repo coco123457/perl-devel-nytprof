@@ -16,7 +16,7 @@ use strict;
 use Carp;
 use Config;
 
-use Devel::NYTProf::Data;
+use Devel::NYTProf::Core;
 
 # These control the limits for what the script will consider ok to severe times
 # specified in standard deviations from the mean time
@@ -97,13 +97,66 @@ sub new {
 }
 
 
+sub dump_profile_data {
+	my ($data, $line_detail, $fh) = @_;
+	$fh ||= \*STDERR;
+	_dump_elements($data, $fh, []);
+}
+
+sub _dump_elements {
+	my ($r, $fh, $path) = @_;
+	my $pad = "    ";
+	my $padN = $pad x (@$path+1);
+
+	my $is_hash = (ref $r eq 'HASH');
+	my ($start, $end, $colon, $keys) = ($is_hash)
+		? ('{', '}', ' => ', [ sort keys %$r ])
+		: ('[', ']', ': ',   [ 0..@$r-1 ]);
+
+	if (1) {
+		($start, $end, $colon) = (undef, undef, "\t");
+		$padN = join "\t", @$path,'';
+	}
+
+	print $fh "$start\n" if $start;
+	$path = [ @$path, undef ];
+	for my $key (@$keys) {
+
+		my $value = ($is_hash) ? $r->{$key} : $r->[$key];
+
+		# skip undef elements in array
+		next if !defined($value) && !$is_hash;
+
+		# special case the common fid_*_time fid->line=[N,N,N]
+		# and sub_fid_lines subname=[fid,start,end] cases to be compact
+		my $as_compact = (ref $value eq 'ARRAY' && @$value <= 3
+											&& !grep { ref or !defined } @$value);
+
+		# print the value intro
+		print $fh "$padN$key$colon"
+			unless ref $value && !$as_compact;
+
+		if ($as_compact) {
+			print $fh "[ @$value ]\n";
+		}
+		elsif (ref $value) {
+			$path->[-1] = $key;
+			_dump_elements($value, $fh, $path);
+		}
+		else {
+			print $fh "$value\n";
+		}
+	}
+	printf $fh "%s$end\n", ($pad x @$path) if $end;
+}
+
+
 sub process {
-	my $filename = shift;
-	my $data = Devel::NYTProf::Data->new( { filename => $filename } );
+	my $data = load_profile_data_from_file(@_);
 	# convert into old-style data structure
 	my $dump = 0;
 	require Data::Dumper if $dump;
-	$data->dump_profile_data({filehandle => \*STDERR, separator => ""}) if $dump;
+	dump_profile_data($data, 1) if $dump;
 	warn Data::Dumper::Dumper($data) if $dump;
 
 	my $fid_filename  = $data->{fid_filename};

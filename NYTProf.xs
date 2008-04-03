@@ -1424,7 +1424,7 @@ _finish(...)
 	}
 
 
-MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Reader
+MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Data
 PROTOTYPES: DISABLE 
 
 HV*
@@ -1452,6 +1452,9 @@ load_profile_data_from_file(file=NULL)
 	fclose(in);
 	OUTPUT:
 	RETVAL
+
+MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Reader
+PROTOTYPES: DISABLE 
 
 IV
 getDatabaseTime()

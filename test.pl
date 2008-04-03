@@ -129,7 +129,7 @@ sub profile {
 
 sub verify_result {
 	my $test = shift;
-	my $hash = eval { Devel::NYTProf::Reader::process() };
+	my $hash = eval { Devel::NYTProf::Reader::process('nytprof.out') };
 	if ($@) {
 		diag($@);
 		fail($test);
