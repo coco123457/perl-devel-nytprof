@@ -162,7 +162,6 @@ WriteMakefile(
 		clean							=> { 
 									FILES	=> "nytprof.out profiler t/nytprof.out t/profiler "
 														."t/auto" },
-		test							=> { TESTS => 'test.pl' },
 		%mm_opts,
 );
 
