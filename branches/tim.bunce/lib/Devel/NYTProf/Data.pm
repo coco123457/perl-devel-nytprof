@@ -193,6 +193,53 @@ sub _dump_elements {
 	printf $fh "%s$end\n", ($pad x (@$path-1)) if $end;
 }
 
+
+=head2 normalize_variables
+
+  $profile->normalize_variables;
+
+Traverses the profile data structure and normalizes highly variable data, such
+as the time, in order that the data can more easily be compared. This is used,
+for example, by the test suite.
+
+The data normalized is:
+
+ - profile timing data: set to 0
+ - basetime attribute: set to 0
+ - xs_version attribute: set to 0
+ - filenames: path removed
+
+=cut
+
+sub normalize_variables {
+	my $self = shift;
+
+  $self->{attribute}{basetime} = 0;
+  $self->{attribute}{xs_version} = 0;
+
+	for (keys %$self) {
+		next unless /^fid_\w+_time$/;
+		#fid_line_times => [fid][line][time,...]
+		# iterate over the fids that have data
+		my $fid_lines = $self->{$_} || [];
+		for my $of_fid (@$fid_lines) {
+			next unless $of_fid;
+			for my $of_line (@$of_fid) {
+				next unless $of_line;
+				#warn "@$of_line\n";
+				$of_line->[0] = 0; # set time to 0
+			}
+		}
+	}
+
+	# remove path from filenames
+	# XXX would be nice to be smarter and just remove library prefixes based on @INC
+	$_ and s{.*/}{} for (@{$self->{fid_filename}});
+
+	return;
+}
+
+
 1;
 
 __END__
