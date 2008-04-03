@@ -140,8 +140,15 @@ http://open.nytimes.com/
 TODO
 ----
 
-Formalize '#' processing: write more info and store into hash on reading.
-Use that to fix getDatabaseTime() getTicksPerSec() etc.
+Fix Reader
+- not document methods with a leading underscore
+- to have consistent_naming_style notMixedCamelCase
+- to be fully OO (ie not document non-OO interfaces)
+- to be subclassable
+- to provide a subclass to manage generating CSV
+- to provide a subclass to manage generating HTML
+Then rework bin/ntyprof* to use the new subclasses
+Ideally end up with a single nytprof command.
 
 Rework option parsing so options can be implemented in and access from perl.
 
