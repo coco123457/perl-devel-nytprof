@@ -4,6 +4,7 @@ Changes
 HACKING
 INSTALL
 lib/Devel/NYTProf.pm
+lib/Devel/NYTProf/Core.pm
 lib/Devel/NYTProf/Reader.pm
 Makefile.PL
 MANIFEST

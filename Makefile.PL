@@ -146,13 +146,12 @@ $mm_opts{LICENSE} = 'perl' if $ExtUtils::MakeMaker::VERSION >= 6.3002;
 
 WriteMakefile(
     NAME              => 'Devel::NYTProf',
-    VERSION_FROM      => 'lib/Devel/NYTProf/ModuleVersion.pm', # finds $VERSION
+    VERSION_FROM      => 'lib/Devel/NYTProf/Core.pm', # finds $VERSION
+    ABSTRACT_FROM     => 'lib/Devel/NYTProf.pm', # retrieve abstract from module
+    AUTHOR            => 'Adam Kaplan <akaplan@cpan.org>, Tim Bunce <timb@cpan.org>',
     PREREQ_PM         => {
     	  'Getopt::Long'    => 0,
     	}, # e.g., Module::Name => 1.1
-    ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
-      (ABSTRACT_FROM  => 'lib/Devel/NYTProf.pm', # retrieve abstract from module
-       AUTHOR         => 'Adam Kaplan <akaplan@cpan.org>') : ()),
     LIBS              => [''], # e.g., '-lm'
     EXE_FILES					=> [ 'bin/nytprofhtml', 'bin/nytprofcsv' ],
     MAN1PODS					=> { 'bin/nytprofhtml' => '$(INST_MAN1DIR)/nytprofhtml.1',

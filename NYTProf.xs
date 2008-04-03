@@ -822,7 +822,7 @@ init_runtime(const char* file) {
 
 /* Initial setup */
 void
-init(pTHX) {
+init_profiler(pTHX) {
 	HV* hash = get_hv("DB::sub", 0);
 
 	/* initialize flock structs portably */
@@ -1375,9 +1375,9 @@ DB(...)
 		DB(aTHX);
 
 void
-init()
+init_profiler()
 	CODE:
-		init(aTHX);
+		init_profiler(aTHX);
 
 void
 _assign_fids();
