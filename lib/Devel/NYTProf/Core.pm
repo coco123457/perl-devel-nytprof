@@ -1,6 +1,6 @@
 package Devel::NYTProf::Core;
 
-# $Id: ModuleVersion.pm 37 2008-03-27 00:24:13Z tim.bunce $
+# $Id$
 
 use XSLoader;
 
