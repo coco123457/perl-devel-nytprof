@@ -1,0 +1,13 @@
+#summary Features wish list for the output of nytprofhtml.
+#labels Phase-Requirements,Featured
+
+= Introduction =
+
+Put down your thoughts for layout, user interaction, CSS/JS/HTML intricacies, etc.
+
+= HTML Feature Wish List =
+  * Drop down for jumping to blocks (subs, evals, loops?) ordered by slowest-fastest.
+  * Code folding -- set a threshold of 'slowness' below which lines of code are hidden.  Exceptions would be fast code immediately surrounding slow code. Measured in distance from the median? seconds? or both?
+
+= Related Features =
+  * Comparison mode! Determine the overall efficiency delta (time, calls, time/call) between two or more sets of output.
