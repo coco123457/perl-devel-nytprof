@@ -1,6 +1,13 @@
 #summary Instructions for hacking this module.
 #labels Phase-Implementation,Phase-QA,Featured
 
+
+= NOTE =
+
+This page is a (possibly out of date) copy of http://code.google.com/p/perl-devel-nytprof/source/browse/trunk/HACKING
+
+Please read that file.
+
 = HACKING Devel::NYTProf =
 
 The New York Times and I encourage hacking Devel::NYTProf!
