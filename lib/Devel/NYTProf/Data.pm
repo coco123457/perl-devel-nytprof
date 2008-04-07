@@ -172,13 +172,12 @@ sub _dump_elements {
 
 		# special case the common fid_*_time fid->line=[N,N,N]
 		# and sub_fid_lines subname=[fid,start,end] cases to be compact
-		my $as_compact = (ref $value eq 'ARRAY' && @$value <= 3
+		my $as_compact = (ref $value eq 'ARRAY' && @$value <= 2
 											&& !grep { ref or !defined } @$value);
 
 		# print the value intro
 		print $fh "$padN$key$colon"
-			unless $separator;
-			#unless ref $value && !$as_compact;
+			unless ref $value && !$as_compact;
 
 		if ($as_compact) {
 			print $fh "[ @$value ]\n";
@@ -219,17 +218,12 @@ sub normalize_variables {
   $self->{attribute}{xs_version} = 0;
 
 	for (keys %$self) {
+		# fid_line_times => [fid][line][time,...]
 		next unless /^fid_\w+_time$/;
-		#fid_line_times => [fid][line][time,...]
 		# iterate over the fids that have data
 		my $fid_lines = $self->{$_} || [];
 		for my $of_fid (@$fid_lines) {
-			next unless $of_fid;
-			for my $of_line (@$of_fid) {
-				next unless $of_line;
-				#warn "@$of_line\n";
-				$of_line->[0] = 0; # set time to 0
-			}
+			_zero_times($of_fid) if $of_fid;
 		}
 	}
 
@@ -239,14 +233,30 @@ sub normalize_variables {
 }
 
 
+sub _zero_times {
+	my ($ary_of_line_data) = @_;
+	for my $line_data (@$ary_of_line_data) {
+		next unless $line_data;
+		$line_data->[0] = 0; # set profile time to 0
+		# if line was a string eval
+		# then recurse to zero the times within the eval lines
+		if (my $eval_lines = $line_data->[2]) {
+			_zero_times($eval_lines); # recurse
+		}
+	}
+}
+
+
 sub _strip_prefix_from_paths {
 	my ($inc, $paths) = @_;
-
 	# remove (absolute) @INC paths from filenames
+
+	# build string regex for each path in @INC
 	my $inc_regex = join "|", map { quotemeta $_ } grep { m/^\// } @$inc;
-	$inc_regex = qr{^$inc_regex/*};
-	# skip any empty/undef paths
-	$_ and s{$inc_regex}{} for (@$paths);
+	# convert to regex object, anchor at start, soak up any /'s at end
+	$inc_regex = qr{^(?:$inc_regex)/*};
+	# stip off prefix using regex, skip any empty/undef paths
+	$_ and s{$inc_regex}{} for @$paths;
 
 	return;
 }

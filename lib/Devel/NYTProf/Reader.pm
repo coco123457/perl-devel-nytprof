@@ -108,7 +108,7 @@ sub _map_new_to_old {
 	# convert into old-style data structure
 	my $dump = 0;
 	require Data::Dumper if $dump;
-	$data->dump_profile_data({filehandle => \*STDERR, separator => ""}) if $dump;
+	$data->dump_profile_data({filehandle => \*STDERR, separator => "\t"}) if $dump;
 	warn Data::Dumper::Dumper($data) if $dump;
 
 	my $fid_filename  = $data->{fid_filename};

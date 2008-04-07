@@ -165,20 +165,27 @@ sub verify_data {
 	}
 
 	$profile->normalize_variables;
+	dump_profile_to_file($profile, "$test.new");
+	my @got      = slurp_file("$test.new");
+	my @expected = slurp_file($test);
 
-	my $expected = eval scalar slurp_file($test);
-
-	is_deeply($profile, $expected, $test)
-		or dump_data_to_file($profile, "$test.new");
+	is_deeply(\@got, \@expected, $test)
+		or diff_files($test, "$test.new");
 }
 
-sub dump_data_to_file {
-	my ($data, $file) = @_;
-	require Data::Dumper;
+sub dump_profile_to_file {
+	my ($profile, $file) = @_;
 	open my $fh, ">", $file or die "Can't open $file: $!\n";
-  my $d = Data::Dumper->new([$data], ['foo']);
-  print $fh $d->Terse(1)->Useqq(1)->Indent(1)->Sortkeys(1)->Dump;
+	$profile->dump_profile_data( {
+		filehandle => $fh,
+		separator  => "\t",
+	} );
 	return;
+}
+
+sub diff_files {
+	# we don't care if this fails, it's just an aid to debug test failures
+	system("diff", "-u", @_);
 }
 
 sub verify_report {
