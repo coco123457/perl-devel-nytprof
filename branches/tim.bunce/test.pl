@@ -41,8 +41,14 @@ my $outdir = 'profiler';
 chdir( 't' ) if -d 't';
 mkdir $outdir or die "mkdir($outdir): $!" unless -d $outdir;
 
+my $tests_per_extn = { p => 1, v => 1, rdt => 1, x => 2 };
+
 s:^t/:: for @ARGV; # allow args to use t/ prefix
-my @tests = @ARGV ? @ARGV : sort <*.p *.v *.w *.x>;  # glob-sort, for OS/2
+# *.p   = perl code to profile
+# *.v   = (old) profile data structure to verify
+# *.rdt = result tsv data dump to verify
+# *.x   = result csv dump to verify (should change to .rcv)
+my @tests = @ARGV ? @ARGV : sort <*.p *.v *.rdt *.x>;  # glob-sort, for OS/2
 
 plan tests => 1 + number_of_tests(@tests);
 
@@ -76,7 +82,7 @@ $|=1;
 foreach my $test (@tests) {
 
 	#print $test . '.'x (20 - length $test);
-	$test =~ /(\w+)\.(\w)$/;
+	$test =~ /(\w+)\.(\w+)$/;
 
 	SKIP: {
 
@@ -88,7 +94,7 @@ foreach my $test (@tests) {
 						if $SKIP_TESTS{$1};
 			verify_old_data($test);
 		}
-		elsif ($2 eq 'w') {
+		elsif ($2 eq 'rdt') {
 			skip "Tests incompatible with your perl version", 1, 
 						if $SKIP_TESTS{$1};
 			verify_data($test);
@@ -268,11 +274,12 @@ sub pop_times {
 	}
 }
 
+
 sub number_of_tests {
 	my $tests = 0;
 	for (@_) {
-		next unless m/\.(.)$/;
-		$tests += { p => 1, v => 1, w => 1, x => 2 }->{$1};
+		next unless m/\.(\w+)$/;
+		$tests += $tests_per_extn->{$1};
 	}
 	return $tests;
 }
