@@ -170,9 +170,10 @@ sub _dump_elements {
 		# skip undef elements in array
 		next if !defined($value) && !$is_hash;
 
-		# special case the common fid_*_time fid->line=[N,N,N]
-		# and sub_fid_lines subname=[fid,start,end] cases to be compact
-		my $as_compact = (ref $value eq 'ARRAY' && @$value <= 2
+		# special case some common cases to be more compact:
+		#		fid_*_time   [fid][line] = [N,N]
+		#		sub_fid_line {subname} = [fid,startline,endline]
+		my $as_compact = (ref $value eq 'ARRAY' && @$value <= 3
 											&& !grep { ref or !defined } @$value);
 
 		# print the value intro
