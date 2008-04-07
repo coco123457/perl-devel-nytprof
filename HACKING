@@ -187,3 +187,6 @@ Add constants to Data.pm for the array indexes
 0=time_spent
 1=exe_count
 2=eval_line_data
+
+Add method to remove data (like sub_fid_lines) relating to specific files
+so that the .rdt tests aren't affected by variations between versions of library modules.
