@@ -150,7 +150,10 @@ Fix Reader
 Then rework bin/ntyprof* to use the new subclasses
 Ideally end up with a single nytprof command.
 
-Rework option parsing so options can be implemented in and access from perl.
+Add (very) basic nytprofhtml test (ie it runs and produces output)
+
+Rework option parsing so options can be implemented in perl, accessed from
+perl, and stored in data file.
 
 Write tests for new functionality.
 
@@ -177,4 +180,10 @@ fork statement gets counted twice currently. set elapsed=0 if pid changes
 Add way for program being profiled to switch output to a new profile file.
 See http://search.cpan.org/dist/Devel-Profile/ for use case.
 
+Add @INC to data file so reports can be made more readable by removing
+(possibly very long) library paths where appropriate.
 
+Add constants to Data.pm for the array indexes
+0=time_spent
+1=exe_count
+2=eval_line_data
