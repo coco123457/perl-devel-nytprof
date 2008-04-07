@@ -208,7 +208,7 @@ The data normalized is:
  - profile timing data: set to 0
  - basetime attribute: set to 0
  - xs_version attribute: set to 0
- - filenames: path removed
+ - filenames: path prefixes matching absolute paths in @INC are removed
 
 =cut
 
@@ -233,9 +233,20 @@ sub normalize_variables {
 		}
 	}
 
-	# remove path from filenames
-	# XXX would be nice to be smarter and just remove library prefixes based on @INC
-	$_ and s{.*/}{} for (@{$self->{fid_filename}});
+	_strip_prefix_from_paths(\@INC, $self->{fid_filename});
+
+	return;
+}
+
+
+sub _strip_prefix_from_paths {
+	my ($inc, $paths) = @_;
+
+	# remove (absolute) @INC paths from filenames
+	my $inc_regex = join "|", map { quotemeta $_ } grep { m/^\// } @$inc;
+	$inc_regex = qr{^$inc_regex/*};
+	# skip any empty/undef paths
+	$_ and s{$inc_regex}{} for (@$paths);
 
 	return;
 }
