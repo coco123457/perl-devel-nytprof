@@ -263,6 +263,114 @@ sub _strip_prefix_from_paths {
 }
 
 
+sub _filename_to_fid {
+	my $self = shift;
+	return $self->{_filename_to_fid_cache} ||= do {
+		my $fid_filename = $self->{fid_filename} || [];
+		my $filename_to_fid = {};
+		for my $fid (1..@$fid_filename-1) {
+			my $filename = $fid_filename->[$fid];
+			$filename = $filename->[0] if ref $filename; # string eval
+			$filename_to_fid->{$filename} = $fid;
+		}
+		$filename_to_fid;
+	};
+}
+
+
+=head2 resolve_fid
+
+  $fid = $profile->resolve_fid( $file );
+
+Returns the integer I<file id> that corresponds to $file.
+
+If $file can't be found and $file looks like a positive integer then it's
+presumed to already be a fid and is returned. This is used to enable other
+methods to work with fid or file arguments.
+
+If $file can't be found but it uniquely matches the suffix of one of the files
+then that corresponding fid is returned.
+
+=cut
+
+sub resolve_fid {
+	my ($self, $file) = @_;
+	my $resolve_fid_cache = $self->_filename_to_fid;
+
+	# exact match
+	return $resolve_fid_cache->{$file}
+		if exists $resolve_fid_cache->{$file};
+
+	# looks like a fid already
+	return $file
+		if $file =~ m/^\d+$/;
+
+	# unfound absolute path, so we're sure we won't find it
+	return undef	# XXX carp?
+		if $file =~ m/^\//;
+
+	# prepend '/' and grep for trailing matches - if just one then use that
+	my $match = qr{/\Q$file\E$};
+	my @matches = grep { m/$match/ } keys %$resolve_fid_cache;
+	return $self->resolve_fid($matches[0])
+		if @matches == 1;
+	carp "Can't resolve '$file' to a unique file id (matches @matches)"
+		if @matches >= 2;
+
+	return undef;
+}
+
+
+=head2 line_calls_for_file
+
+  $line_calls_hash = $profile->line_calls_for_file( $file );
+
+Returns a reference to a hash containing information about subroutine calls
+made at individual lines within a source file.  lines in the file.  The $file
+argument can be an integer file id (fid) or a file path. Returns undef if the
+profile contains no C<sub_caller> data.
+
+The keys of the returned hash are line numbers. The values are references to
+hashes with fully qualifies subroutine names as keys and integer call counts as
+values.
+
+For example, if the following was line 42 of a file C<foo.pl>:
+
+  ++$wiggle if foo(24) == bar(42);
+
+that line was executed once, and foo and bar were imported from pkg1, then
+$profile->line_calls_for_file( 'foo.pl' ) would return:
+
+	{
+		42 => {
+			'pkg1::foo' => 1,
+			'pkg1::bar' => 1,
+		},
+	}
+
+=cut
+
+sub line_calls_for_file {
+	my ($self, $fid) = @_;
+
+	$fid = $self->resolve_fid($fid);
+	my $sub_caller = $self->{sub_caller}
+		or return;
+
+	my $line_calls = {};
+	while ( my ($sub, $fid_hash) = each %$sub_caller) {
+		my $line_calls_hash = $fid_hash->{$fid}
+			or next;
+
+		while ( my ($line, $calls) = each %$line_calls_hash) {
+			$line_calls->{$line}{$sub} += $calls;
+		}
+
+	}
+	return $line_calls;
+}
+
+
 1;
 
 __END__
