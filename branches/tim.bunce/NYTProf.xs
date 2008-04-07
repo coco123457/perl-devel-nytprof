@@ -751,7 +751,8 @@ pp_entersub_profiler(pTHX) {
 	 */
 	op = pp_entersub_orig(aTHX);
 
-	if (op != next_op && prev_cop) { /* have entered a sub */
+	/* have entered a sub and we're profiling */
+	if (op != next_op && prev_cop && SvTRUE(PL_DBsingle)) {
 
 		/* get line, file, and fid for statement *before* the call */
 		char *file = OutCopFILE(PL_curcop);
