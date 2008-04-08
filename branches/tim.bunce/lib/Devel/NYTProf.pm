@@ -147,7 +147,7 @@ Set trace level to N. 0 is off (the default). Higher values cause more detailed 
 
 =item allowfork
 
-Enables fork detection and file locking and disables output buffering.  This will have a severe effect on performance, so use only with code that can fork. You B<MUST> use this with code that forks! [default: off]
+Enables fork detection and file locking and disables output buffering.  This will have a severe effect on performance, so use only with code that can fork. You I<MUST> use this with code that forks! [default: off]
 
 =item usecputime
 
@@ -157,9 +157,11 @@ Measuring CPU time has the advantage of making the measurements independant of
 time spent blocked waiting for the cpu or network i/o etc. But it also has the
 disadvantage of having I<far> less accurate timings on most systems.
 
-=item use_stdout
+=item file=...
 
-Tells the profiler to write output to STDOUT. [default: ./nytprof.out]
+Specify the output file to write profile data to (default: 'nytprof.out').
+The filenames 'STDOUT' and 'STDERR' are reserved and refer to the standard
+output and standard error streams respectively.
 
 =back
 

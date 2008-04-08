@@ -69,7 +69,6 @@ static struct flock lockl;	/* initialised in init() */
 static struct flock locku;	/* initialised in init() */
 
 /* defaults */
-static char* default_file = "nytprof.out";
 static FILE* out;
 static FILE* in;
 static pid_t first_pid;
@@ -79,10 +78,7 @@ static bool usecputime = 0;
 static bool profile_blocks = 0;
 
 /* options and overrides */
-static char PROF_output_file[MAXPATHLEN+1];
-static char READER_input_file[MAXPATHLEN+1];
-static bool PROF_use_stdout = 0;
-static bool READER_use_stdin = 0;
+static char PROF_output_file[MAXPATHLEN+1] = "nytprof.out";
 static bool embed_fid_line = 0;
 static int trace_level = 0;
 
@@ -112,7 +108,7 @@ unsigned int get_file_id(char*, STRLEN, int);
 void output_int(unsigned int);
 void DB(pTHX);
 void set_option(const char*);
-void open_file(bool);
+void open_output_file(char *);
 void init_runtime();
 void init(pTHX);
 void DEBUG_print_stats(pTHX);
@@ -666,34 +662,31 @@ DB(pTHX) {
  */
 void
 set_option(const char* option) {
-	if(0 == strncmp(option, "use_stdout", 10)) {
-		if (trace_level) warn("# Using standard out for output.\n");
-		PROF_use_stdout = 1;
-	} else if(0 == strncmp(option, "in=", 3)) {
-		strncpy(READER_input_file, &option[3], MAXPATHLEN);
-		if (trace_level) warn("# Using  %s for input.\n", READER_input_file);
-	} else if(0 == strncmp(option, "out=", 4)) {
-		strncpy(PROF_output_file, &option[4], MAXPATHLEN);
+	if(0 == strncmp(option, "file=", 4)) {
+		strncpy(PROF_output_file, &option[5], MAXPATHLEN);
 		if (trace_level) warn("# Using %s for output.\n", PROF_output_file);
-	} else if(0 == strncmp(option, "use_stdin", 9)) {
-		if (trace_level) warn("# Using stanard in for input.\n");
-		READER_use_stdin = 1;
-	} else if(0 == strncmp(option, "allowfork", 9)) {
+	}
+	else if(0 == strncmp(option, "allowfork", 9)) {
 		if (trace_level) warn("# Fork mode: ENABLED.\n");
 		forkok = 1;
-	} else if(0 == strncmp(option, "usecputime", 10)) {
+	}
+	else if(0 == strncmp(option, "usecputime", 10)) {
 		if (trace_level) warn("# Using cpu time.\n");
 		usecputime = 1;
-	} else if(0 == strncmp(option, "blocks", 6)) {
+	}
+	else if(0 == strncmp(option, "blocks", 6)) {
 		if (trace_level) warn("# profiling blocks.\n");
 		profile_blocks = 1;
-	} else if(0 == strncmp(option, "expand", 6)) {
+	}
+	else if(0 == strncmp(option, "expand", 6)) {
 		if (trace_level) warn("# expand\n");
 		embed_fid_line = 1;
-	} else if(0 == strncmp(option, "trace=", 6)) {
+	}
+	else if(0 == strncmp(option, "trace=", 6)) {
 		trace_level = atoi(option+6);
 		if (trace_level) warn("# trace set to %d.\n", trace_level);
-	} else {
+	}
+	else {
 		warn("Unknown option: %s\n", option);
 	}
 }
@@ -703,24 +696,24 @@ set_option(const char* option) {
  * without the environment parsing overhead after each fork.
  */
 void
-open_file(bool forked) {
+open_output_file(char *filename) {
 
-  char *filename;
-	char *mode = (forked) ? "ab" : "wb";
+	char *mode = "wb";
 	int fd;
-	if (PROF_use_stdout) {										/* output to stdout */
+	if (strEQ(filename, "STDOUT")) {
 		fd = dup(STDOUT_FILENO);
 		if (-1 == fd)
 			perror("Unable to dup stdout");
 		filename = NULL;
 	}
-	else if (0 != strlen(PROF_output_file)) {	/* output to user provided file */
-		filename = PROF_output_file;
-	} else {																	/* output to default output file */
-		filename = default_file;
+	else if (strEQ(filename, "STDERR")) {
+		fd = dup(STDOUT_FILENO);
+		if (-1 == fd)
+			perror("Unable to dup stdout");
+		filename = NULL;
 	}
 	if (trace_level)
-			warn("Opening %s (%s)\n", (filename) ? filename : "STDOUT", mode);
+			warn("Opening %s (%s)\n", filename, mode);
 
 	out = (filename) ? fopen(filename, mode) : fdopen(fd, mode);
 }
@@ -802,7 +795,7 @@ pp_entersub_profiler(pTHX) {
  * Populate runtime values from environment, the running script or use defaults
  */
 void
-init_runtime(const char* file) {
+init_runtime() {
 
 	/* Runtime configuration
 	   Environment vars have lower priority */
@@ -823,15 +816,6 @@ init_runtime(const char* file) {
 		}
 	}
 
-	/* a file name passed to load_profile_data_from_file(...) has the highest 
-	 * priority
-	 */
-	if (NULL != file) {
-		READER_use_stdin = 0;
-		PROF_use_stdout = 0;
-		strncpy(READER_input_file, file, strlen(file));
-		strncpy(PROF_output_file, file, strlen(file));
-	}
 }
 
 /* Initial setup */
@@ -862,9 +846,9 @@ init_profiler(pTHX) {
 	hashtable.table = (Hash_entry**)safemalloc(hashtable_memwidth);
 	memset(hashtable.table, 0, hashtable_memwidth);
 	
-	init_runtime(NULL);
+	init_runtime();
 
-	open_file(0);
+	open_output_file(PROF_output_file);
 	if (out == NULL) {
 		croak("Failed to open output: %s", strerror(errno));
 	}
@@ -1458,22 +1442,19 @@ HV*
 load_profile_data_from_file(file=NULL)
 	char *file;
 	CODE:
-	init_runtime(file);
+	init_runtime();
 
-	if (READER_use_stdin) {
+	if (strEQ(file,"STDIN")) {
 		int fd = dup(STDIN_FILENO);
 		if (-1 == fd)
 			croak("Unable to dup stdin: %s", strerror(errno));
 		in = fdopen(fd, "r");
 	}
-	else if (0 != strlen(READER_input_file)) {
-		in = fopen(READER_input_file, "rb");
-	}
 	else {
-		in = fopen(default_file, "rb");
+		in = fopen(file, "rb");
 	}
 	if (in == NULL) {
-		croak("Failed to open input: %s", strerror(errno));
+		croak("Failed to open input '%s': %s", file, strerror(errno));
 	}
 	RETVAL = load_profile_data_from_stream();
 	fclose(in);
