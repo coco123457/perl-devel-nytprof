@@ -1,0 +1,19 @@
+attribute	basetime	0
+attribute	ticks_per_sec	1000000
+attribute	xs_version	0
+fid_filename	1	test14.p
+fid_filename	2	test14.pm
+fid_filename	3	[ (eval 6)[test14.pm (autosplit into auto/test14/bar.al):11] 2 11 ]
+fid_line_time	1	8	[ 0 1 ]
+fid_line_time	1	9	[ 0 1 ]
+fid_line_time	2	7	[ 0 1 ]
+fid_line_time	2	11	0	0
+fid_line_time	2	11	1	2
+fid_line_time	2	11	2	1	[ 0 1 ]
+fid_line_time	2	14	[ 0 1 ]
+sub_caller	AutoLoader::AUTOLOAD	1	8	1
+sub_caller	AutoLoader::AUTOLOAD	1	9	1
+sub_fid_line	main::BEGIN	[ 1 7 7 ]
+sub_fid_line	test14::BEGIN	[ 2 2 2 ]
+sub_fid_line	test14::bar	[ 2 10 12 ]
+sub_fid_line	test14::foo	[ 2 6 8 ]
