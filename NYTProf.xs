@@ -220,12 +220,12 @@ hash_op (Hash_entry entry, Hash_entry** retval, bool insert) {
 	while(NULL != found) {
 
 		if (found->key_len == entry.key_len && 
-				0 == strncmp(found->key, entry.key, entry.key_len)) {
+				strnEQ(found->key, entry.key, entry.key_len)) {
 			*retval = found;
 			return 0;
 		}
 
-		if(NULL == (Hash_entry*)found->next_entry) {
+		if (NULL == (Hash_entry*)found->next_entry) {
 			if (insert) {
 
 				Hash_entry* e = (Hash_entry*)safemalloc(sizeof(Hash_entry));
@@ -259,14 +259,14 @@ hash_op (Hash_entry entry, Hash_entry** retval, bool insert) {
 		return 1;
 	}
 
-	retval = NULL;
+	*retval = NULL;
 	return -1;
 }
 
 /**
  * Return a unique persistent id number for a file.
  * If file name has not been seen before
- * then, if create_new is false it returns 0 othwise it
+ * then, if create_new is false it returns 0 otherwise it
  * assigns a new id and outputs the file and id to the stream.
  * If the file name is a synthetic name for an eval then
  * get_file_id recurses to process the 'embedded' file name first.
@@ -287,7 +287,7 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 	entry.key = file_name;
 	entry.key_len = file_name_len;
 
-	if(1 == hash_op(entry, &found, create_new)) {	/* inserted new entry */
+	if (1 == hash_op(entry, &found, create_new)) {	/* inserted new entry */
 	  /* if this is a synthetic filename for an 'eval'
 		 * ie "(eval 42)[/some/filename.pl:line]"
 		 * then ensure we've already generated an id for the underlying filename
@@ -332,14 +332,13 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 					found->id, found->key_len, found->key);
 		}
 	}
-	else if (!found) {
-		return 0;
-  }
   else if (trace_level >= 4) {
-		warn("fid %d: %.*s\n", found->id, found->key_len, found->key);
+		if (found)
+		     warn("fid %d: %.*s\n",   found->id, found->key_len, found->key);
+		else warn("fid %d: %.*s NOT FOUND\n", 0,  entry.key_len,  entry.key);
 	}
 
-	return found->id;
+	return (found) ? found->id : 0;
 }
 
 /**
