@@ -160,8 +160,8 @@ WriteMakefile(
     												# e.g., '-I. -I/usr/include/other'
     INC               => "-I. -I$INCLUDE", # e.g., '-I. -I/usr/include/other'
 		clean							=> { 
-									FILES	=> "nytprof.out profiler t/nytprof.out t/profiler "
-														."t/auto" },
+			FILES	=> "nytprof.out profiler t/nytprof.out t/profiler t/test*.rdt.new t/auto"
+		},
 		%mm_opts,
 );
 
