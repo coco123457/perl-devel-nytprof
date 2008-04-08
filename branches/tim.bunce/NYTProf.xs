@@ -83,6 +83,7 @@ static char PROF_output_file[MAXPATHLEN+1];
 static char READER_input_file[MAXPATHLEN+1];
 static bool PROF_use_stdout = 0;
 static bool READER_use_stdin = 0;
+static bool embed_fid_line = 0;
 static int trace_level = 0;
 
 /* time tracking */
@@ -117,7 +118,7 @@ void init(pTHX);
 void DEBUG_print_stats(pTHX);
 HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
-															double time, int count);
+															double time, int count, unsigned int fid);
 
 OP *pp_entersub_profiler(pTHX);
 OP *(*pp_entersub_orig)(pTHX);
@@ -686,6 +687,9 @@ set_option(const char* option) {
 	} else if(0 == strncmp(option, "blocks", 6)) {
 		if (trace_level) warn("# profiling blocks.\n");
 		profile_blocks = 1;
+	} else if(0 == strncmp(option, "expand", 6)) {
+		if (trace_level) warn("# expand\n");
+		embed_fid_line = 1;
 	} else if(0 == strncmp(option, "trace=", 6)) {
 		trace_level = atoi(option+6);
 		if (trace_level) warn("# trace set to %d.\n", trace_level);
@@ -895,31 +899,35 @@ add_entry(pTHX_ AV *dest_av, unsigned int file_num, unsigned int line_num,
 	bool eval_mode = eval_file_num;
 
   /* get ref to array of per-line data */
-	SV *line_time_rvav = *av_fetch(dest_av, 
-													(eval_line_num) ? eval_file_num : file_num, 1);
+  unsigned int fid = (eval_line_num) ? eval_file_num : file_num;
+	SV *line_time_rvav = *av_fetch(dest_av, fid, 1);
 
 	if (!SvROK(line_time_rvav))		/* autoviv */
 			sv_setsv(line_time_rvav, newRV_noinc((SV*)newAV()));
 
-  /* times for string evals are accumulated within the line the eval is on */
   if (!eval_line_num) {
-		store_profile_line_entry(aTHX_ line_time_rvav, line_num, time, 1);
+		store_profile_line_entry(aTHX_ line_time_rvav, line_num, time, 1, fid);
 	}
 	else {
-		AV *av = store_profile_line_entry(aTHX_ line_time_rvav, eval_line_num,
-																			0, 0);
+		/* times for statements executed *within* a string eval are accumulated
+		 * embedded nested within the line the eval is on but without increasing
+		 * the time or count of the eval itself. Instead the time and count is
+		 * accumulated for each line within the eval on an embedded array reference.
+		 */
+		AV *av = store_profile_line_entry(aTHX_ line_time_rvav, eval_line_num, 0, 0, fid);
+
 		SV *eval_line_time_rvav = *av_fetch(av, 2, 1);
 		if (!SvROK(eval_line_time_rvav))		/* autoviv */
 				sv_setsv(eval_line_time_rvav, newRV_noinc((SV*)newAV()));
 
-		store_profile_line_entry(aTHX_ eval_line_time_rvav, line_num, time, 1);
+		store_profile_line_entry(aTHX_ eval_line_time_rvav, line_num, time, 1, fid);
 	}
 }
 
 
 AV *
 store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, double time, 
-													int count)
+													int count, unsigned int fid)
 {
 	SV *time_rvav = *av_fetch((AV*)SvRV(rvav), line_num, 1);
 	AV *line_av;
@@ -928,6 +936,11 @@ store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, double time,
 		sv_setsv(time_rvav, newRV_noinc((SV*)line_av));
 		av_store(line_av, 0, newSVnv(time));
 		av_store(line_av, 1, newSViv(count));
+		/* if eval then   2  is used for lines within the string eval */
+		if (embed_fid_line) {	/* used to optimize reporting */
+			av_store(line_av, 3, newSVuv(fid));
+			av_store(line_av, 4, newSVuv(line_num));
+		}
 	}
 	else {
 		line_av = (AV*)SvRV(time_rvav);
