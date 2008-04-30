@@ -61,9 +61,12 @@ t/test13.x
 t/test14.p
 t/test14.pm
 t/test14.pm.x
+t/test14.rdt
 t/test14.v
 t/test14.x
 t/test15.p
 t/test15.v
 t/test15.x
+t/test50-disable.p
+t/test50-disable.x
 test.pl
