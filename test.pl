@@ -22,6 +22,8 @@ use Test::More;
 use Devel::NYTProf::Reader;
 
 
+$|=1;
+
 # skip these tests when the provided condition is true
 my %SKIP_TESTS = (
 	'test06' => ($] < 5.008) ? 1 : 0,
@@ -63,6 +65,8 @@ if( -d '../bin' ) {
 
 my $perl5lib = $opt_include || join( $path_sep, @INC );
 my $perl = $opt_perl || $^X;
+# turn ./perl into ../perl, because of chdir(t) above.
+$perl = ".$perl" if $perl =~ m|^\./|;
 
 if( $opts{v} ){
 	print "tests: @tests\n";
@@ -82,26 +86,25 @@ $|=1;
 foreach my $test (@tests) {
 
 	#print $test . '.'x (20 - length $test);
-	$test =~ /(\w+)\.(\w+)$/;
+	$test =~ /(.+?)\.(\w+)$/ or do {
+		warn "Can't parse test filename '$test'";
+		next;
+	};
 
 	SKIP: {
+		skip "Tests incompatible with your perl version", number_of_tests($test)
+			if $SKIP_TESTS{$1};
 
 		if ($2 eq 'p') {
 			profile($test);
 		}
 		elsif ($2 eq 'v') {
-			skip "Tests incompatible with your perl version", 1, 
-						if $SKIP_TESTS{$1};
 			verify_old_data($test);
 		}
 		elsif ($2 eq 'rdt') {
-			skip "Tests incompatible with your perl version", 1, 
-						if $SKIP_TESTS{$1};
 			verify_data($test);
 		}
 		elsif ($2 eq 'x') {
-			skip "Tests incompatible with your perl version", 2, 
-						if $SKIP_TESTS{$1};
 			verify_report($test);
 		}
 	}
@@ -202,7 +205,7 @@ sub verify_report {
 	# parse/check
   my $infile;
   { local ($1, $2);
-	$test =~ /^(\w+\.(\w+\.)?)x$/;
+	$test =~ /^(.+?\.(\w+\.)?)x$/;
   $infile = $1;
   if (defined $2) {
   } else {
@@ -261,7 +264,8 @@ sub verify_report {
 		print "\n";
 	}
 
-	is_deeply(\@got, \@expected, $test);
+	is_deeply(\@got, \@expected, $test)
+		or spit_file("$test.new", join("", @got));
 	is(join("\n",@accuracy_errors), '', $test);
 }
 
@@ -293,5 +297,11 @@ sub slurp_file { # individual lines in list context, entire file in scalar conte
 	return <$fh>;
 }
 
+sub spit_file {
+	my ($file, $content) = @_;
+	open my $fh, ">", $file or die "Can't open $file: $!\n";
+	print $fh $content;
+	close $fh or die "Error closing $file: $!";
+}
 
 # vim:ts=2:sw=2
