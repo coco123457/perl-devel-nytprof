@@ -62,8 +62,6 @@ typedef struct hash_table {
 static Hash_table hashtable = {NULL, MAX_HASH_SIZE};
 /* END Hash table definitions */
 
-static char error[255];
-
 /* constants */
 static struct flock lockl;	/* initialised in init() */
 static struct flock locku;	/* initialised in init() */
@@ -97,7 +95,6 @@ static unsigned int last_sub_line;
 static bool firstrun = 1;
 
 /* reader module variables */
-static HV* profile;
 static unsigned int ticks_per_sec = 0; /* 0 forces error if not set */
 
 /* prototypes */
@@ -175,7 +172,7 @@ print_header(pTHX) {
 
 	/* XXX add options, $0, etc, but beware of embedded newlines */
 	/* XXX would be good to adopt a proper charset & escaping for these */
-	fprintf(out, ":%s=%d\n", "basetime", PL_basetime); /* $^T */
+	fprintf(out, ":%s=%lu\n", "basetime", (unsigned long)PL_basetime); /* $^T */
 	fprintf(out, ":%s=%s\n", "xs_version", XS_VERSION);
 	fprintf(out, ":%s=%u\n", "ticks_per_sec", ticks);
 
@@ -291,6 +288,7 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 		 */
 		unsigned int eval_fid = 0;
 		unsigned int eval_line_num = 0;
+
 		if ('(' == file_name[0] && ']' == file_name[file_name_len-1]) {
 			char *start = strchr(file_name, '[');
 			char *colon = ":";
@@ -308,6 +306,10 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 
 		if (forkok)
 			lock_file();
+
+		if (*file_name != '/') {
+			/* XXX append file_name to cwd */
+		}
 
 		fputc('@', out);
 		output_int(found->id);
@@ -391,8 +393,9 @@ dopopcx_at(pTHX_ PERL_CONTEXT *cxstk, I32 startingblock, UV stop_at)
     I32 i;
     register PERL_CONTEXT *cx;
     for (i = startingblock; i >= 0; i--) {
+        UV type_bit;
         cx = &cxstk[i];
-        UV type_bit = 1 << CxTYPE(cx);
+        type_bit = 1 << CxTYPE(cx);
         if (type_bit & stop_at)
             return i;
     }
@@ -468,7 +471,6 @@ static PERL_CONTEXT *
 visit_contexts(pTHX_ UV stop_at, int (*callback)(pTHX_ PERL_CONTEXT *cx, 
 								UV *stop_at_ptr)) 
 {
-    dSP;
     /* modelled on pp_caller() in pp_ctl.c */
     register I32 cxix = cxstack_ix;
     register PERL_CONTEXT *cx = NULL;
@@ -566,7 +568,6 @@ _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
  */
 void
 DB(pTHX) {
-	IV line;
 	char *file;
 	unsigned int elapsed;
 	COP *cop = PL_curcop;
@@ -699,7 +700,7 @@ void
 open_output_file(char *filename) {
 
 	char *mode = "wb";
-	int fd;
+	int fd = -1;
 	if (strEQ(filename, "STDOUT")) {
 		fd = dup(STDOUT_FILENO);
 		if (-1 == fd)
@@ -755,11 +756,13 @@ pp_entersub_profiler(pTHX) {
 		int line = CopLINE(PL_curcop);
 		unsigned int fid = get_file_id(file, strlen(file), 1);
 		char fid_line_key[50];
-		sprintf(fid_line_key, "%u:%d", fid, line);
 
 		/* get name of sub we've just entered */
 		GV *cvgv = CvGV(cxstack[cxstack_ix].blk_sub.cv);
 		SV *subname_sv = newSV(0);
+		SV *sv_tmp;
+
+		sprintf(fid_line_key, "%u:%d", fid, line);
 
 		if (0) fprintf(stderr, "PL_curcop %p %d %p (op_next %p)\n", cxstack, 
 										cxstack_ix, PL_curcop, next_op);
@@ -776,12 +779,12 @@ pp_entersub_profiler(pTHX) {
 							SvPV_nolen(subname_sv), OP_NAME(op));
 
 		/* { subname => { "fid:line" => count } } */
-		SV *sv = *hv_fetch(sub_callers_hv, SvPV_nolen(subname_sv), 
+		sv_tmp = *hv_fetch(sub_callers_hv, SvPV_nolen(subname_sv), 
 												SvCUR(subname_sv), 1);
-		if (!SvROK(sv)) /* autoviv */
-			sv_setsv(sv, newRV_noinc((SV*)newHV()));
-		sv = *hv_fetch((HV*)SvRV(sv), fid_line_key, strlen(fid_line_key), 1);
-		sv_inc(sv);
+		if (!SvROK(sv_tmp)) /* autoviv */
+			sv_setsv(sv_tmp, newRV_noinc((SV*)newHV()));
+		sv_tmp = *hv_fetch((HV*)SvRV(sv_tmp), fid_line_key, strlen(fid_line_key), 1);
+		sv_inc(sv_tmp);
 	}
 	return op;
 }
@@ -822,6 +825,7 @@ init_runtime() {
 void
 init_profiler(pTHX) {
 	HV* hash = get_hv("DB::sub", 0);
+	unsigned int hashtable_memwidth;
 
 	/* initialize flock structs portably */
 	lockl.l_type   = F_WRLCK;
@@ -842,7 +846,7 @@ init_profiler(pTHX) {
 	}
 
 	/* create file id mapping hash */
-	unsigned int hashtable_memwidth = sizeof(Hash_entry*) * hashtable.size;
+	hashtable_memwidth = sizeof(Hash_entry*) * hashtable.size;
 	hashtable.table = (Hash_entry**)safemalloc(hashtable_memwidth);
 	memset(hashtable.table, 0, hashtable_memwidth);
 	
@@ -880,8 +884,6 @@ void
 add_entry(pTHX_ AV *dest_av, unsigned int file_num, unsigned int line_num,			
 					double time, unsigned int eval_file_num, unsigned int eval_line_num) 
 {
-	bool eval_mode = eval_file_num;
-
   /* get ref to array of per-line data */
   unsigned int fid = (eval_line_num) ? eval_file_num : file_num;
 	SV *line_time_rvav = *av_fetch(dest_av, fid, 1);
@@ -927,8 +929,9 @@ store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, double time,
 		}
 	}
 	else {
+		SV *time_sv;
 		line_av = (AV*)SvRV(time_rvav);
-		SV *time_sv = *av_fetch(line_av, 0, 1);
+		time_sv = *av_fetch(line_av, 0, 1);
 		sv_setnv(time_sv, time + SvNV(time_sv));
 		if (count) {
 		  SV *sv = *av_fetch(line_av, 1, 1);
@@ -945,6 +948,9 @@ write_sub_line_ranges(pTHX, int fids_only) {
 	I32 sub_name_len;
 	SV *file_lines_sv;
 	HV *hv = GvHV(PL_DBsub);
+
+	if (trace_level >= 2)
+		warn("writing sub line ranges\n");
 
 	lock_file();
 	hv_iterinit(hv);
@@ -994,6 +1000,8 @@ write_sub_callers(pTHX) {
 
 	if (!sub_callers_hv)
 		return;
+	if (trace_level >= 2)
+		warn("writing sub callers\n");
 
 	lock_file();
 	hv_iterinit(sub_callers_hv);
@@ -1297,7 +1305,6 @@ load_profile_data_from_stream() {
 
 			case 'p':
 			{
-				SV *ppid_sv;
 				unsigned int pid = read_int();
 				sprintf(text, "%d", pid);
 				if (!hv_delete(live_pids_hv, text, strlen(text), 0))
@@ -1383,6 +1390,7 @@ PROTOTYPES: DISABLE
 void
 DB(...)
 	CODE:
+		PERL_UNUSED_VAR(items);
 		DB(aTHX);
 
 void
