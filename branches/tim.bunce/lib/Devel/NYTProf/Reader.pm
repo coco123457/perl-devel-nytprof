@@ -17,6 +17,7 @@ use Carp;
 use Config;
 
 use Devel::NYTProf::Data;
+use Devel::NYTProf::Util qw(strip_prefix_from_paths);
 
 # These control the limits for what the script will consider ok to severe times
 # specified in standard deviations from the mean time
@@ -31,8 +32,11 @@ $FLOAT_FORMAT =~ s/"//g;
 # Class methods
 sub new {
 	my $class = shift;
+	my $file = shift;
+	my $opts = shift;
+
 	my $self = {
-			file => 'nytprof.out',
+			file => $file || 'nytprof.out',
 			output_dir => '.',
 			suffix => '.csv',
 			header => 
@@ -86,12 +90,11 @@ sub new {
 			},
 		};
 
-	if (defined $_[0]) {
-		$self->{file} = $_[0];
-	}
-
 	bless($self, $class);
 	$self->{profile} = Devel::NYTProf::Data->new( { filename => $self->{file} } );
+
+	$self->{profile}->make_fid_filenames_relative($opts->{relative_paths});
+
 	$self->{data} = _map_new_to_old($self->{profile});
 	return $self;
 }
@@ -99,7 +102,9 @@ sub new {
 
 sub process {
 	my $filename = shift;
+	my $opts = shift;
 	my $data = Devel::NYTProf::Data->new( { filename => $filename } );
+	$data->make_fid_filenames_relative($opts->{relative_paths});
 	return _map_new_to_old($data);
 }
 
@@ -213,7 +218,7 @@ sub _test_file {
 	my $self = shift;
 	my $file = shift;
 	unless (-f $file) {
-		carp "Unable to locate source file: $file\n";
+		carp "Unable to locate source file '$file'\n";
 		return 0; 
 	}
 	return 1 if (stat $file)[9] > $self->{profile}{attribute}{basetime};
@@ -345,7 +350,7 @@ sub report {
 		print OUT $datastart;
 
 		if (! open (IN, $filestr)) {
-			confess "Unable to open $filestr for reading: $!\n"
+			confess "Unable to open '$filestr' for reading: $!\n"
 			.'Try running again in the same directory as you ran Devel::NYTProf,'
 			."or ensure \@INC is correct.\n";
 		}

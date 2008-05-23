@@ -18,8 +18,10 @@ use Benchmark;
 use Getopt::Long;
 use Config;
 use Test::More;
+use Data::Dumper;
 
 use Devel::NYTProf::Reader;
+use Devel::NYTProf::Util qw(strip_prefix_from_paths);
 
 
 $|=1;
@@ -145,7 +147,10 @@ sub profile {
 
 sub verify_old_data {
 	my $test = shift;
-	my $hash = eval { Devel::NYTProf::Reader::process('nytprof.out') };
+	my $hash = eval {
+		my %opts = ( relative_paths => [ @INC, '.' ] );
+		Devel::NYTProf::Reader::process('nytprof.out', \%opts)
+	};
 	if ($@) {
 		diag($@);
 		fail($test);
@@ -159,7 +164,8 @@ sub verify_old_data {
 
 	my $expected;
 	eval scalar slurp_file($test);
-	is_deeply($hash, $expected, $test);
+	is_deeply($hash, $expected, $test)
+		or dump_data_to_file($hash, "$test.new");
 }
 
 
@@ -180,6 +186,15 @@ sub verify_data {
 
 	is_deeply(\@got, \@expected, $test)
 		or diff_files($test, "$test.new");
+}
+
+sub dump_data_to_file {
+	my ($profile, $file) = @_;
+	open my $fh, ">", $file or die "Can't open $file: $!\n";
+	local $Data::Dumper::Indent = 1;
+	local $Data::Dumper::SortKeys = 1;
+	print $fh Data::Dumper->Dump([$profile],['expected']);
+	return;
 }
 
 sub dump_profile_to_file {
