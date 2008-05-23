@@ -11,6 +11,7 @@ lib/Devel/NYTProf.pm
 lib/Devel/NYTProf/Core.pm
 lib/Devel/NYTProf/Data.pm
 lib/Devel/NYTProf/Reader.pm
+lib/Devel/NYTProf/Util.pm
 ppport.h
 t/00.load.t
 t/90.pod.t
