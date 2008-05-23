@@ -11,7 +11,8 @@
 ###########################################################
 package Devel::NYTProf;
 
-package DB;
+package	# hide the package from the PAUSE indexer
+	DB;
 
 BEGIN {
 	# setting $^P non-zero automatically initializes perl debugging internals
