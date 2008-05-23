@@ -874,8 +874,6 @@ init_profiler(pTHX) {
 		(*u2time)(aTHX_ start_utime);
 #endif
 	}
-	/* force first fid to be NYTProf.pm itself */
-	get_file_id(OutCopFILE(PL_curcop), strlen(OutCopFILE(PL_curcop)), 1);
 }
 
 /************************************
