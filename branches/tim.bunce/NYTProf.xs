@@ -777,7 +777,7 @@ pp_entersub_profiler(pTHX) {
 		SV *subname_sv = newSV(0);
 		SV *sv_tmp;
 
-		sprintf(fid_line_key, "%u:%d", fid, line);
+		int fid_line_key_len = sprintf(fid_line_key, "%u:%d", fid, line);
 
 		if (0) fprintf(stderr, "PL_curcop %p %d %p (op_next %p)\n", cxstack, 
 										cxstack_ix, PL_curcop, next_op);
@@ -798,7 +798,7 @@ pp_entersub_profiler(pTHX) {
 												SvCUR(subname_sv), 1);
 		if (!SvROK(sv_tmp)) /* autoviv */
 			sv_setsv(sv_tmp, newRV_noinc((SV*)newHV()));
-		sv_tmp = *hv_fetch((HV*)SvRV(sv_tmp), fid_line_key, strlen(fid_line_key), 1);
+		sv_tmp = *hv_fetch((HV*)SvRV(sv_tmp), fid_line_key, fid_line_key_len, 1);
 		sv_inc(sv_tmp);
 	}
 	return op;
@@ -1277,6 +1277,7 @@ load_profile_data_from_stream() {
 			case 'c':	/* sub callers */
 			{
 				SV *sv;
+				int len;
 				unsigned int fid   = read_int();
 				unsigned int line  = read_int();
 				unsigned int count = read_int();
@@ -1294,13 +1295,13 @@ load_profile_data_from_stream() {
 				if (!SvROK(sv))		/* autoviv */
 						sv_setsv(sv, newRV_noinc((SV*)newHV()));
 
-				sprintf(text, "%u", fid);
-				sv = *hv_fetch((HV*)SvRV(sv), text, strlen(text), 1);
+				len = sprintf(text, "%u", fid);
+				sv = *hv_fetch((HV*)SvRV(sv), text, len, 1);
 				if (!SvROK(sv)) /* autoviv */
 					sv_setsv(sv, newRV_noinc((SV*)newHV()));
 
-				sprintf(text, "%u", line);
-				sv = *hv_fetch((HV*)SvRV(sv), text, strlen(text), 1);
+				len = sprintf(text, "%u", line);
+				sv = *hv_fetch((HV*)SvRV(sv), text, len, 1);
 
 				sv_setuv(sv, count);
 				break;
@@ -1310,8 +1311,8 @@ load_profile_data_from_stream() {
 			{
 				unsigned int pid  = read_int();
 				unsigned int ppid = read_int();
-				sprintf(text, "%d", pid);
-				hv_store(live_pids_hv, text, strlen(text), newSVuv(ppid), 0);
+				int len = sprintf(text, "%d", pid);
+				hv_store(live_pids_hv, text, len, newSVuv(ppid), 0);
 				if (trace_level)
 					warn("Start of profile data for pid %s (ppid %d, %d pids live)\n",
 						text, ppid, HvKEYS(live_pids_hv));
@@ -1321,8 +1322,8 @@ load_profile_data_from_stream() {
 			case 'p':
 			{
 				unsigned int pid = read_int();
-				sprintf(text, "%d", pid);
-				if (!hv_delete(live_pids_hv, text, strlen(text), 0))
+				int len = sprintf(text, "%d", pid);
+				if (!hv_delete(live_pids_hv, text, len, 0))
 					warn("Inconsistent pids in profile data (pid %d not introduced)", 
 								pid);
 				if (trace_level)
