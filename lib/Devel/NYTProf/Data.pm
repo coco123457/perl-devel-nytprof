@@ -27,8 +27,10 @@ use warnings;
 use strict;
 
 use Carp;
+use Cwd qw(getcwd);
 
 use Devel::NYTProf::Core;
+use Devel::NYTProf::Util qw(strip_prefix_from_paths);
 
 =head2 new
 
@@ -228,10 +230,18 @@ sub normalize_variables {
 		}
 	}
 
-	_strip_prefix_from_paths(\@INC, $self->{fid_filename});
+	$self->make_fid_filenames_relative( [ @INC, '.' ] );
 
 	return;
 }
+
+
+sub make_fid_filenames_relative {
+	my ($self, $roots) = @_;
+	$roots ||= [ '.' ]; # e.g. [ @INC, '.' ]
+	strip_prefix_from_paths($roots, $self->{fid_filename});
+}
+
 
 
 sub _zero_times {
@@ -245,21 +255,6 @@ sub _zero_times {
 			_zero_times($eval_lines); # recurse
 		}
 	}
-}
-
-
-sub _strip_prefix_from_paths {
-	my ($inc, $paths) = @_;
-	# remove (absolute) @INC paths from filenames
-
-	# build string regex for each path in @INC
-	my $inc_regex = join "|", map { quotemeta $_ } grep { m/^\// } @$inc;
-	# convert to regex object, anchor at start, soak up any /'s at end
-	$inc_regex = qr{^(?:$inc_regex)/*};
-	# stip off prefix using regex, skip any empty/undef paths
-	$_ and s{$inc_regex}{} for @$paths;
-
-	return;
 }
 
 

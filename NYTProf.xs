@@ -282,7 +282,9 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 	entry.key_len = file_name_len;
 
 	if (1 == hash_op(entry, &found, create_new)) {	/* inserted new entry */
-	  /* if this is a synthetic filename for an 'eval'
+		char file_name_abs[MAXPATHLEN * 2];
+
+		/* if this is a synthetic filename for an 'eval'
 		 * ie "(eval 42)[/some/filename.pl:line]"
 		 * then ensure we've already generated an id for the underlying filename
 		 */
@@ -304,12 +306,22 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 			eval_line_num = atoi(end+1);
 		}
 
+		/* convert relative paths to absolute */
+		if (!eval_fid && *file_name != '/') {
+			/* note that we don't use realpath() or similar here */
+			/* because we want to keep the programs view of symlinks etc */
+			char *ptr = getcwd(file_name_abs, sizeof(file_name_abs));
+			PERL_UNUSED_VAR(ptr);
+			if (strnEQ(file_name, "./", 2))
+			     ++file_name;
+			else strcat(file_name_abs, "/");
+			strncat(file_name_abs, file_name, file_name_len);
+			file_name = &file_name_abs[0];
+			file_name_len = strlen(file_name);
+		}
+
 		if (forkok)
 			lock_file();
-
-		if (*file_name != '/') {
-			/* XXX append file_name to cwd */
-		}
 
 		fputc('@', out);
 		output_int(found->id);
@@ -628,9 +640,12 @@ DB(pTHX) {
 	}
 
 	file = OutCopFILE(cop);
-	/* XXX temporary restriction until we get better support for forking  */
-	/* if we've forked then we no longer allow new fids to be generated   */
-	last_executed_file = get_file_id(file, strlen(file), (last_pid == first_pid));
+	/* XXX temporary restriction until we get better support for forking,
+	 * if we've forked then we no longer allow new fids to be generated.
+	 * Also no new fids if we're not profiling - that's a workaround for
+	 * the DB() call in _finish() generating an extra fid for NYTProf.xs in perl 5.8.8
+	 */
+	last_executed_file = get_file_id(file, strlen(file), (last_pid == first_pid) ? SvIV(PL_DBsingle) : 0);
 	last_executed_line = CopLINE(cop);
 
   if (profile_blocks) {
