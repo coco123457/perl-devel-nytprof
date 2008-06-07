@@ -132,12 +132,6 @@ $INCLUDE = $stdio_ext_dir if defined $stdio_ext_dir;
 my $DEFINE = '-DHAS'.uc($fpurge);
 $DEFINE .= ' -DHAS_STDIO_EXT_H' if defined $stdio_ext_dir;
 
-# ---
-
-if ($Config::Config{d_gettimeod}) {
-    $DEFINE .= ' -D_HAS_GETTIMEOFDAY';
-}
-
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 my %mm_opts;
