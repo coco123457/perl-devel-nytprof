@@ -14,7 +14,11 @@
 #include "perl.h"
 #include "XSUB.h"
 
-#include "ppport.h"
+#ifndef NO_PPPORT_H
+#   define NEED_my_strlcpy
+#   define NEED_my_snprintf
+#   include "ppport.h"
+#endif
 
 #if (PERL_VERSION < 8) || ((PERL_VERSION == 8) && (PERL_SUBVERSION < 8))
 #undef PL_curcop
@@ -82,7 +86,7 @@ static int trace_level = 0;
 
 /* time tracking */
 static struct tms start_ctime, end_ctime;
-#ifdef _HAS_GETTIMEOFDAY
+#ifdef HAS_GETTIMEOFDAY
 static struct timeval start_time, end_time;
 #else
 static int (*u2time)(pTHX_ UV *) = 0;
@@ -229,8 +233,8 @@ hash_op (Hash_entry entry, Hash_entry** retval, bool insert) {
 				e->key = (char*)safemalloc(sizeof(char) * e->key_len + 1);
 				e->key[e->key_len] = '\0';
 				strncpy(e->key, entry.key, e->key_len);
-
-				*retval = found->next_entry = e;
+                                found->next_entry = e;
+				*retval = (Hash_entry*)found->next_entry;
 				return 1;
 			} else {
 				*retval = NULL;
@@ -293,7 +297,7 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 
 		if ('(' == file_name[0] && ']' == file_name[file_name_len-1]) {
 			char *start = strchr(file_name, '[');
-			char *colon = ":";
+			const char *colon = ":";
 			/* can't use strchr here (not nul terminated) so use rninstr */
 			char *end = rninstr(file_name, file_name+file_name_len-1, colon, colon+1);
 
@@ -388,7 +392,7 @@ void output_int(unsigned int i) {
 }
 
 
-static char* block_type[] = {
+static const char* block_type[] = {
     "NULL",
     "SUB",
     "EVAL",
@@ -589,7 +593,7 @@ DB(pTHX) {
 		elapsed = end_ctime.tms_utime - start_ctime.tms_utime
 						+ end_ctime.tms_stime - start_ctime.tms_stime;
 	} else {
-#ifdef _HAS_GETTIMEOFDAY
+#ifdef HAS_GETTIMEOFDAY
 		gettimeofday(&end_time, NULL);
 		elapsed = (end_time.tv_sec - start_time.tv_sec) * 1000000
 						+ end_time.tv_usec - start_time.tv_usec;
@@ -664,7 +668,7 @@ DB(pTHX) {
 	if (usecputime) {
 		times(&start_ctime);
 	} else {
-#ifdef _HAS_GETTIMEOFDAY
+#ifdef HAS_GETTIMEOFDAY
 		gettimeofday(&start_time, NULL);
 #else
 		start_utime[2];
@@ -714,7 +718,7 @@ set_option(const char* option) {
 void
 open_output_file(char *filename) {
 
-	char *mode = "wb";
+	const char *mode = "wb";
 	int fd = -1;
 	if (strEQ(filename, "STDOUT")) {
 		fd = dup(STDOUT_FILENO);
@@ -777,11 +781,11 @@ pp_entersub_profiler(pTHX) {
 		SV *subname_sv = newSV(0);
 		SV *sv_tmp;
 
-		int fid_line_key_len = sprintf(fid_line_key, "%u:%d", fid, line);
-
-		if (0) fprintf(stderr, "PL_curcop %p %d %p (op_next %p)\n", cxstack, 
+		int fid_line_key_len = my_snprintf(fid_line_key, sizeof(fid_line_key), "%u:%d", fid, line);
+#if 0
+		fprintf(stderr, "PL_curcop %p %d %p (op_next %p)\n", cxstack, 
 										cxstack_ix, PL_curcop, next_op);
-
+#endif
 		if (isGV(cvgv)) {
 			gv_efullname3(subname_sv, cvgv, Nullch);
 		}
@@ -822,7 +826,7 @@ init_runtime() {
 		char env[500];
 		char* result = NULL;
 
-		strcpy(env, sysenv);
+		my_strlcpy(env, sysenv, sizeof(env));
 		result = strtok(env, ":");
 
 		if (NULL == result) {
@@ -880,7 +884,7 @@ init_profiler(pTHX) {
 	if (usecputime) {
 		times(&start_ctime);
 	} else {
-#ifdef _HAS_GETTIMEOFDAY
+#ifdef HAS_GETTIMEOFDAY
 		gettimeofday(&start_time, NULL);
 #else
 		SV **svp = hv_fetch(PL_modglobal, "Time::U2time", 12, 0);
@@ -1064,13 +1068,11 @@ read_int() {
 	d = fgetc(in);
 	if (d < 0x80) { /* 7 bits */
 		newint = d;
-		return newint;
 	}
 	else if (d < 0xC0) { /* 14 bits */
 		newint = d & 0x7F;
 		newint <<= 8;
 		newint |= (unsigned char)fgetc(in);
-		return newint;
 	} 
 	else if (d < 0xE0) { /* 21 bits */
 		newint = d & 0x1F;
@@ -1078,7 +1080,6 @@ read_int() {
 		newint |= (unsigned char)fgetc(in);
 		newint <<= 8;
 		newint |= (unsigned char)fgetc(in);
-		return newint;
 	} 
 	else if (d < 0xFF) { /* 28 bits */
 		newint = d & 0xF;
@@ -1088,7 +1089,6 @@ read_int() {
 		newint |= (unsigned char)fgetc(in);
 		newint <<= 8;
 		newint |= (unsigned char)fgetc(in);
-		return newint;
 	} 
 	else if (d == 0xFF) { /* 32 bits */
 		newint = (unsigned char)fgetc(in);
@@ -1098,11 +1098,8 @@ read_int() {
 		newint |= (unsigned char)fgetc(in);
 		newint <<= 8;
 		newint |= (unsigned char)fgetc(in);
-		return newint;
-	} else {
-		dTHX;
-		croak("File format error. Unrecognized marker");
 	}
+        return newint;
 }
 
 /**
@@ -1295,12 +1292,12 @@ load_profile_data_from_stream() {
 				if (!SvROK(sv))		/* autoviv */
 						sv_setsv(sv, newRV_noinc((SV*)newHV()));
 
-				len = sprintf(text, "%u", fid);
+				len = my_snprintf(text, sizeof(text), "%u", fid);
 				sv = *hv_fetch((HV*)SvRV(sv), text, len, 1);
 				if (!SvROK(sv)) /* autoviv */
 					sv_setsv(sv, newRV_noinc((SV*)newHV()));
 
-				len = sprintf(text, "%u", line);
+				len = my_snprintf(text, sizeof(text), "%u", line);
 				sv = *hv_fetch((HV*)SvRV(sv), text, len, 1);
 
 				sv_setuv(sv, count);
@@ -1311,7 +1308,7 @@ load_profile_data_from_stream() {
 			{
 				unsigned int pid  = read_int();
 				unsigned int ppid = read_int();
-				int len = sprintf(text, "%d", pid);
+				int len = my_snprintf(text, sizeof(text), "%d", pid);
 				hv_store(live_pids_hv, text, len, newSVuv(ppid), 0);
 				if (trace_level)
 					warn("Start of profile data for pid %s (ppid %d, %d pids live)\n",
@@ -1322,7 +1319,7 @@ load_profile_data_from_stream() {
 			case 'p':
 			{
 				unsigned int pid = read_int();
-				int len = sprintf(text, "%d", pid);
+				int len = my_snprintf(text, sizeof(text), "%d", pid);
 				if (!hv_delete(live_pids_hv, text, len, 0))
 					warn("Inconsistent pids in profile data (pid %d not introduced)", 
 								pid);
@@ -1373,23 +1370,17 @@ load_profile_data_from_stream() {
 	sv_free((SV*)live_pids_hv);
 
 	profile_hv = newHV();
-	hv_store(profile_hv, "attribute",       9, newRV_noinc((SV*)attr_hv), 0);
-	hv_store(profile_hv, "fid_filename",   12, 
-						newRV_noinc((SV*)fid_filename_av), 0);
-	hv_store(profile_hv, "fid_line_time",  13, 
-						newRV_noinc((SV*)fid_line_time_av), 0);
+	hv_stores(profile_hv, "attribute",      newRV_noinc((SV*)attr_hv));
+	hv_stores(profile_hv, "fid_filename",   newRV_noinc((SV*)fid_filename_av));
+	hv_stores(profile_hv, "fid_line_time",  newRV_noinc((SV*)fid_line_time_av)); 
 	if (fid_block_time_av)
-		hv_store(profile_hv, "fid_block_time", 14, 
-							newRV_noinc((SV*)fid_block_time_av), 0);
+		hv_stores(profile_hv, "fid_block_time", newRV_noinc((SV*)fid_block_time_av)); 
 	if (fid_sub_time_av)
-		hv_store(profile_hv, "fid_sub_time",   12, 
-							newRV_noinc((SV*)fid_sub_time_av), 0);
+		hv_stores(profile_hv, "fid_sub_time",   newRV_noinc((SV*)fid_sub_time_av)); 
 	if (sub_fid_lines_hv)
-		hv_store(profile_hv, "sub_fid_line",   12, 
-							newRV_noinc((SV*)sub_fid_lines_hv), 0);
+		hv_stores(profile_hv, "sub_fid_line",   newRV_noinc((SV*)sub_fid_lines_hv)); 
 	if (sub_callers_hv)
-		hv_store(profile_hv, "sub_caller",     10, 
-							newRV_noinc((SV*)sub_callers_hv), 0);
+		hv_stores(profile_hv, "sub_caller",     newRV_noinc((SV*)sub_callers_hv)); 
 	return profile_hv;
 }
 
