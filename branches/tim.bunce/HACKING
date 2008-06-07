@@ -166,22 +166,19 @@ Add <a name=$line_number> to html output to enable linking to lines
 
 Ability to run bin/nytprof* in perl -d (debugger mode)
 
-Seperate NYTProf.xs into two (or more) C files so that profiler and reader code
-is seperate.  Leave only common in NYTProf.xs
-
 (tim.bunce)
 Currently the cost of calling the sub goes to the caller (good)
 but the cost of copying the result goes to the method (poor).
 Overriding pp_leavesub may allow more accurate measurements by avoiding return
 value processing overheads accumulating on last statement in sub.
 
-fork statement gets counted twice currently. set elapsed=0 if pid changes
-
 Add way for program being profiled to switch output to a new profile file.
 See http://search.cpan.org/dist/Devel-Profile/ for use case.
 
 Add @INC to data file so reports can be made more readable by removing
 (possibly very long) library paths where appropriate.
+
+Add perl version $] to data file.
 
 Add constants to Data.pm for the array indexes
 0=time_spent
