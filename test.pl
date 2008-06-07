@@ -261,7 +261,9 @@ sub verify_report {
 		my $c0 = $2;
 		my $tc0 = $3;
 
-		if (0 != $expected[$index] =~ s/^\|([0-9.]+)\|(.*)/0$2/o) {
+		if (defined $expected[$index] and
+			0 != $expected[$index] =~ s/^\|([0-9.]+)\|(.*)/0$2/
+		) {
 			push @accuracy_errors, "$test line $index: got $t0 expected ~$1 for time"
 				if abs($1 - $t0) > 0.2; # Test times. expected to be within 200ms
 			my $tc = $t0 / $c0;
