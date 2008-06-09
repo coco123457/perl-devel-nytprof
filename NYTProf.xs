@@ -610,9 +610,8 @@ DB(pTHX) {
 		return;
 
 	if (!firstrun) { 
-		if (forkok)
-			lock_file();
 		if (forkok) {
+			lock_file();
 			if (last_pid != getpid()) { /* handle forks */
 				if (trace_level >= 1)
 					warn("New pid %d (was %d)\n", getpid(), last_pid);
@@ -682,7 +681,7 @@ DB(pTHX) {
  */
 void
 set_option(const char* option) {
-	if(0 == strncmp(option, "file=", 4)) {
+	if(0 == strncmp(option, "file=", 5)) {
 		strncpy(PROF_output_file, &option[5], MAXPATHLEN);
 		if (trace_level) warn("# Using %s for output.\n", PROF_output_file);
 	}
