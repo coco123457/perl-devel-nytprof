@@ -109,8 +109,9 @@ unsigned int get_file_id(char*, STRLEN, int);
 void output_int(unsigned int);
 void DB(pTHX);
 void set_option(const char*);
-void open_output_file(char *);
-void init_runtime();
+void open_output_file(pTHX_ char *);
+void check_if_forked(pTHX);
+void set_options_from_env();
 void init(pTHX);
 void DEBUG_print_stats(pTHX);
 HV *load_profile_data_from_stream();
@@ -604,23 +605,13 @@ DB(pTHX) {
 #endif
 	}
 
-	/* out should never be NULL, but perl sometimes falls into DB() AFTER
-	   it calls _finish() (which is ONLY used in END {...}. Strange!) */
 	if (!out)
 		return;
 
 	if (!firstrun) { 
 		if (forkok) {
 			lock_file();
-			if (last_pid != getpid()) { /* handle forks */
-				if (trace_level >= 1)
-					warn("New pid %d (was %d)\n", getpid(), last_pid);
-				last_pid = getpid();
-#ifdef FPURGE
-				FPURGE(out);
-#endif
-				OUTPUT_PID();
-			}
+			check_if_forked(aTHX);
 		}
 
 		fputc( (profile_blocks) ? '*' : '+', out);
@@ -715,26 +706,62 @@ set_option(const char* option) {
  * without the environment parsing overhead after each fork.
  */
 void
-open_output_file(char *filename) {
+open_output_file(pTHX_ char *filename) {
 
+  char filename_buf[MAXPATHLEN];
 	const char *mode = "wb";
-	int fd = -1;
-	if (strEQ(filename, "STDOUT")) {
+	int fd = -2;
+
+	if (out && SvIV(PL_DBsingle)) {	/* already opened so assume forking */
+		sprintf(filename_buf, "%s.%d.%d", filename, getpid(), getppid());
+		filename = filename_buf;
+	}
+	else if (strEQ(filename, "STDOUT")) {
 		fd = dup(STDOUT_FILENO);
-		if (-1 == fd)
-			perror("Unable to dup stdout");
-		filename = NULL;
 	}
 	else if (strEQ(filename, "STDERR")) {
-		fd = dup(STDOUT_FILENO);
-		if (-1 == fd)
-			perror("Unable to dup stdout");
-		filename = NULL;
+		fd = dup(STDERR_FILENO);
 	}
-	if (trace_level)
-			warn("Opening %s (%s)\n", filename, mode);
 
-	out = (filename) ? fopen(filename, mode) : fdopen(fd, mode);
+	if (-1 == fd) {
+		if (out) {
+			/* caller is expected to have purged old out if appropriate */
+			out = NULL;
+		}
+	}
+  else {
+		if (trace_level)
+				warn("Opening %s (%s)\n", filename, mode);
+
+		out = (filename) ? fopen(filename, mode) : fdopen(fd, mode);
+	}
+
+	if (!out) {	/* failed to open */
+		/* disable profiling */
+		sv_setiv(PL_DBsingle, 0);
+		croak("Failed to open output '%s': %s", filename, strerror(errno));
+	}
+
+	print_header(aTHX);
+}
+
+
+void
+check_if_forked(pTHX) {
+	if (last_pid == getpid())
+		return;
+	if (trace_level >= 1)
+		warn("New pid %d (was %d)\n", getpid(), last_pid);
+	last_pid = getpid();
+#ifdef FPURGE
+	FPURGE(out);
+#endif
+	if (0) {
+		open_output_file(aTHX_ PROF_output_file);
+	}
+	else {
+		OUTPUT_PID();
+	}
 }
 
 
@@ -816,7 +843,7 @@ pp_entersub_profiler(pTHX) {
  * Populate runtime values from environment, the running script or use defaults
  */
 void
-init_runtime() {
+set_options_from_env() {
 
 	/* Runtime configuration
 	   Environment vars have lower priority */
@@ -868,14 +895,9 @@ init_profiler(pTHX) {
 	hashtable.table = (Hash_entry**)safemalloc(hashtable_memwidth);
 	memset(hashtable.table, 0, hashtable_memwidth);
 	
-	init_runtime();
+	set_options_from_env();
 
-	open_output_file(PROF_output_file);
-	if (out == NULL) {
-		croak("Failed to open output: %s", strerror(errno));
-	}
-
-	print_header(aTHX);
+	open_output_file(aTHX_ PROF_output_file);
 
 	intercept_opcodes(aTHX);
 
@@ -1456,7 +1478,7 @@ HV*
 load_profile_data_from_file(file=NULL)
 	char *file;
 	CODE:
-	init_runtime();
+	set_options_from_env();
 
 	if (strEQ(file,"STDIN")) {
 		int fd = dup(STDIN_FILENO);
