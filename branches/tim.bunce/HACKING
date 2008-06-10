@@ -180,6 +180,10 @@ Add @INC to data file so reports can be made more readable by removing
 
 Add perl version $] to data file.
 
+Intercept all opcodes that may fork (ie fork, open, others?)
+	and fflush before executing the op (so fpurge isn't strictly required)
+  and reinit_if_forked() afterwards (risk of missing a fork does by XS?)
+
 Add constants to Data.pm for the array indexes
 0=time_spent
 1=exe_count
@@ -187,3 +191,7 @@ Add constants to Data.pm for the array indexes
 
 Add method to remove data (like sub_fid_lines) relating to specific files
 so that the .rdt tests aren't affected by variations between versions of library modules.
+
+Support profiling programs which use threads:
+	- move all relevant globals into a structure
+	- add lock around output to file
