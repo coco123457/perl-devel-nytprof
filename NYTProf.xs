@@ -125,7 +125,7 @@ HV *sub_callers_hv;
 
 /* macros for outputing profile data */
 #define OUTPUT_PID() STMT_START { \
-	fputc('P', out); output_int(getpid()); output_int(getppid()); \
+	assert(out != NULL); fputc('P', out); output_int(getpid()); output_int(getppid()); \
 } STMT_END
 
 
@@ -141,6 +141,7 @@ print_header(pTHX) {
 	time_t basetime = PL_basetime;
 	unsigned int ticks = (usecputime) ? CLOCKS_PER_SEC : 1000000;
 
+	assert(out != NULL)
 	/* File header with "magic" string, with file major and minor version */
 	fprintf(out, "NYTProf %d %d\n", 1, 0);
 	/* Human readable comments and attributes follow
@@ -305,7 +306,8 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 
 		/* if this is a synthetic filename for an 'eval'
 		 * ie "(eval 42)[/some/filename.pl:line]"
-		 * then ensure we've already generated an id for the underlying filename
+		 * then ensure we've already generated an id for the underlying
+		 * filename
 		 */
 		if ('(' == file_name[0] && ']' == file_name[file_name_len-1]) {
 			char *start = strchr(file_name, '[');
@@ -530,9 +532,11 @@ visit_contexts(pTHX_ UV stop_at, int (*callback)(pTHX_ PERL_CONTEXT *cx,
     return NULL; /* not reached */
 }
 
+
 int
 _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 {
+		PERL_UNUSED_ARG(stop_at_ptr);
 		COP *near_cop;
 
 		if (CxTYPE(cx) == CXt_SUB) {
@@ -582,6 +586,7 @@ _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 	last_block_line = CopLINE(near_cop);
 	return 0;
 }
+
 
 /**
  * PerlDB implementation. Called before each breakable statement
