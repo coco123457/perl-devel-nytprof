@@ -34,8 +34,11 @@ my %SKIP_TESTS = (
 );
 
 my %opts;
-GetOptions(\%opts, qw/p=s I=s v/);
+GetOptions(\%opts,
+	qw/p=s I=s v|verbose d|debug/
+) or exit 1;
 
+$opts{v} ||= $opts{d};
 $ENV{NYTPROF} = ''; # avoid external interference, but see NYTPROF_TEST below
 $| = 1;
 
@@ -199,9 +202,9 @@ sub verify_data {
 
 sub dump_data_to_file {
 	my ($profile, $file) = @_;
-	open my $fh, ">", $file or die "Can't open $file: $!\n";
+	open my $fh, ">", $file or croak "Can't open $file: $!";
 	local $Data::Dumper::Indent = 1;
-	local $Data::Dumper::SortKeys = 1;
+	local $Data::Dumper::Sortkeys = 1;
 	print $fh Data::Dumper->Dump([$profile],['expected']);
 	return;
 }
@@ -209,7 +212,7 @@ sub dump_data_to_file {
 
 sub dump_profile_to_file {
 	my ($profile, $file) = @_;
-	open my $fh, ">", $file or die "Can't open $file: $!\n";
+	open my $fh, ">", $file or croak "Can't open $file: $!";
 	$profile->dump_profile_data( {
 		filehandle => $fh,
 		separator  => "\t",
@@ -227,22 +230,24 @@ sub diff_files {
 sub verify_report {
 	my ($test, $profile_datafile) = @_;
 
+	# generate and parse/check csv report
+
 	my @results = run_command("$perl $fprofcsv --file=$profile_datafile");
 
-	# parse/check
-  my $infile;
-  { local ($1, $2);
-	$test =~ /^(.+?\.(\w+\.)?)x$/;
-  $infile = $1;
-  if (defined $2) {
-  } else {
-    $infile .= "p.";
-  }
-  }
-	my @got      = slurp_file("$outdir/${infile}csv");
+	# determine the name of the generated csv file
+	my $csvfile = $test;
+	# fork tests will still report using the original script name
+	$csvfile =~ s/\.\d\./.0./;
+
+	# foo.p  => foo.p.csv  is tested by foo.x
+	# foo.pm => foo.pm.csv is tested by foo.pm.x
+	$csvfile =~ s/\.x//;
+	$csvfile .= ".p" unless $csvfile =~ /\.p/;
+
+	my @got      = slurp_file("$outdir/${csvfile}.csv");
 	my @expected = slurp_file($test);
 
-	if ($opts{v}) {
+	if ($opts{d}) {
 		print "GOT:\n";
 		print @got;
 		print "EXPECTED:\n";
@@ -287,7 +292,7 @@ sub verify_report {
 		$index++;
 	}
 
-	if ($opts{v}) {
+	if ($opts{d}) {
 		print "TRANSFORMED TO:\n";
 		print @got;
 		print "\n";
@@ -310,18 +315,20 @@ sub pop_times {
 
 
 sub number_of_tests {
-	my $tests = 0;
+	my $total_tests = 0;
 	for (@_) {
 		next unless m/\.(\w+)$/;
-		$tests += $tests_per_extn->{$1};
+		my $tests = $tests_per_extn->{$1};
+		warn "Unknown test type '$1' for test file '$_'\n" if not defined $tests;
+		$total_tests += $tests if $tests;
 	}
-	return $tests;
+	return $total_tests;
 }
 
 
 sub slurp_file { # individual lines in list context, entire file in scalar context
 	my ($file) = @_;
-	open my $fh, "<", $file or die "Can't open $file: $!\n";
+	open my $fh, "<", $file or croak "Can't open $file: $!";
 	return <$fh> if wantarray;
 	local $/ = undef; # slurp;
 	return <$fh>;
@@ -330,7 +337,7 @@ sub slurp_file { # individual lines in list context, entire file in scalar conte
 
 sub spit_file {
 	my ($file, $content) = @_;
-	open my $fh, ">", $file or die "Can't open $file: $!\n";
+	open my $fh, ">", $file or croak "Can't open $file: $!";
 	print $fh $content;
 	close $fh or die "Error closing $file: $!";
 }
