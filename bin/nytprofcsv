@@ -21,25 +21,27 @@ my %opt = (
     file    => 'nytprof.out',
     out	    => 'profiler',
 );
-GetOptions(\%opt, qw/file|f=s delete|d out|o=s help|h/);
+GetOptions(\%opt,
+    qw/file|f=s delete|d out|o=s help|h/
+) or exit 1;
 
 if (defined($opt{help})) {
   &usage;
-  exit;
+  exit 1;
 }
 
 # handle file selection option
 if (! -r $opt{file}) {
-  die "Unable to access $opt{file}\n";
+  die "$0: Unable to access $opt{file}\n";
 }
 
 # handle handle output location
 if (!-e $opt{out}) {
 	# will be created
 } elsif (!-d $opt{out}) {
-  die "Specified output directory `$opt{out}' is a file. whoops!\n";
+  die "$0: Specified output directory `$opt{out}' is a file. whoops!\n";
 } elsif (!-w $opt{out}) {
-  die "Unable to write to output directory `$opt{out}'\n";
+  die "$0: Unable to write to output directory `$opt{out}'\n";
 }
 
 # handle deleting old db's
