@@ -227,7 +227,7 @@ sub diff_files {
 sub verify_report {
 	my ($test, $profile_datafile) = @_;
 
-	my @results = run_command("$perl $fprofcsv");
+	my @results = run_command("$perl $fprofcsv --file=$profile_datafile");
 
 	# parse/check
   my $infile;
