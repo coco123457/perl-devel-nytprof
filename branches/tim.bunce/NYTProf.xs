@@ -756,7 +756,7 @@ reinit_if_forked(pTHX) {
 		warn("New pid %d (was %d)\n", getpid(), last_pid);
 	last_pid = getpid();
 #ifdef FPURGE
-	fpurge(out);
+	FPURGE(out);
 #endif
   /* we don't bother closing the current out fh so if we don't have fpurge
 	* any old pending data that was duplicated by the fork won't be written
