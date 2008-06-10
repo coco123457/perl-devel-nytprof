@@ -536,8 +536,8 @@ visit_contexts(pTHX_ UV stop_at, int (*callback)(pTHX_ PERL_CONTEXT *cx,
 int
 _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 {
-		PERL_UNUSED_ARG(stop_at_ptr);
 		COP *near_cop;
+		PERL_UNUSED_ARG(stop_at_ptr);
 
 		if (CxTYPE(cx) == CXt_SUB) {
 				if (PL_debstash && CvSTASH(cx->blk_sub.cv) == PL_debstash)
