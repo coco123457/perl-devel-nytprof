@@ -30,7 +30,7 @@ my %opt = (
 );
 GetOptions(\%opt,
   qw/file|f=s delete|d out|o=s lib|l=s help|h/
-) exit 1;
+) or exit 1;
 
 if (defined($opt{help})) {
 	&usage;
