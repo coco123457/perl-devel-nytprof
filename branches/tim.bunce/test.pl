@@ -13,6 +13,7 @@
 use warnings;
 use strict;
 
+use Carp;
 use ExtUtils::testlib;
 use Benchmark;
 use Getopt::Long;
@@ -41,6 +42,7 @@ $| = 1;
 my $opt_perl = $opts{p};
 my $opt_include = $opts{I};
 my $outdir = 'profiler';
+my $profile_datafile = 'nytprof_t.out';
 
 chdir( 't' ) if -d 't';
 mkdir $outdir or die "mkdir($outdir): $!" unless -d $outdir;
@@ -76,11 +78,7 @@ if( $opts{v} ){
 	print "perl5lib: $perl5lib\n";
 	print "fprofcvs: $fprofcsv\n";
 }
-if( $perl =~ m|^\./| ) {
-	# turn ./perl into ../perl, because of chdir(t) above.
-	$perl = ".$perl";
-}
-#ok(-f $perl, "Where's Perl?");
+
 ok(-x $fprofcsv, "Where's fprofcsv?");
 
 
@@ -88,26 +86,33 @@ $|=1;
 foreach my $test (@tests) {
 
 	#print $test . '.'x (20 - length $test);
-	$test =~ /(.+?)\.(\w+)$/ or do {
+	$test =~ / (.+?) \. (?:(\d)\.)? (\w+) $/x or do {
 		warn "Can't parse test filename '$test'";
 		next;
 	};
+	my ($basename, $fork_seqn, $type) = ($1, $2||0, $3);
 
 	SKIP: {
 		skip "Tests incompatible with your perl version", number_of_tests($test)
-			if $SKIP_TESTS{$1};
+			if $SKIP_TESTS{$basename};
 
-		if ($2 eq 'p') {
-			profile($test);
+		my $test_datafile = (profile_datafiles($profile_datafile))[ $fork_seqn ];
+
+		if ($type eq 'p') {
+			unlink_old_profile_datafiles($profile_datafile);
+			profile($test, $profile_datafile);
 		}
-		elsif ($2 eq 'v') {
-			verify_old_data($test);
+		elsif ($type eq 'v') {
+			verify_old_data($test, $test_datafile);
 		}
-		elsif ($2 eq 'rdt') {
-			verify_data($test);
+		elsif ($type eq 'rdt') {
+			verify_data($test, $test_datafile);
 		}
-		elsif ($2 eq 'x') {
-			verify_report($test);
+		elsif ($type eq 'x') {
+			verify_report($test, $test_datafile);
+		}
+		else {
+			warn "Unrecognized extension '$type' on test file '$test'\n";
 		}
 	}
 }
@@ -128,12 +133,14 @@ sub run_command {
   return @results;
 }
 
+
 sub profile {
-	my $test = shift;
+	my ($test, $profile_datafile) = @_;
 	
 	my @NYTPROF;
 	push @NYTPROF, $ENV{NYTPROF_TEST} if $ENV{NYTPROF_TEST};
 	push @NYTPROF, "allowfork" if $test eq "test04.p";
+	push @NYTPROF, "file=$profile_datafile";
 	local $ENV{NYTPROF} = join ":", @NYTPROF;
 	print "NYTPROF=$ENV{NYTPROF}\n" if $opts{v} && $ENV{NYTPROF};
 
@@ -146,10 +153,11 @@ sub profile {
 
 
 sub verify_old_data {
-	my $test = shift;
+	my ($test, $profile_datafile) = @_;
+
 	my $hash = eval {
 		my %opts = ( relative_paths => [ @INC, '.' ] );
-		Devel::NYTProf::Reader::process('nytprof.out', \%opts)
+		Devel::NYTProf::Reader::process($profile_datafile, \%opts)
 	};
 	if ($@) {
 		diag($@);
@@ -170,9 +178,9 @@ sub verify_old_data {
 
 
 sub verify_data {
-	my $test = shift;
+	my ($test, $profile_datafile) = @_;
 
-	my $profile = eval { Devel::NYTProf::Data->new( { filename => 'nytprof.out' }) };
+	my $profile = eval { Devel::NYTProf::Data->new( { filename => $profile_datafile }) };
 	if ($@) {
 		diag($@);
 		fail($test);
@@ -188,6 +196,7 @@ sub verify_data {
 		or diff_files($test, "$test.new");
 }
 
+
 sub dump_data_to_file {
 	my ($profile, $file) = @_;
 	open my $fh, ">", $file or die "Can't open $file: $!\n";
@@ -196,6 +205,7 @@ sub dump_data_to_file {
 	print $fh Data::Dumper->Dump([$profile],['expected']);
 	return;
 }
+
 
 sub dump_profile_to_file {
 	my ($profile, $file) = @_;
@@ -207,13 +217,15 @@ sub dump_profile_to_file {
 	return;
 }
 
+
 sub diff_files {
 	# we don't care if this fails, it's just an aid to debug test failures
 	system("diff", "-u", @_);
 }
 
+
 sub verify_report {
-	my $test = shift;
+	my ($test, $profile_datafile) = @_;
 
 	my @results = run_command("$perl $fprofcsv");
 
@@ -286,6 +298,7 @@ sub verify_report {
 	is(join("\n",@accuracy_errors), '', $test);
 }
 
+
 sub pop_times {
 	my $hash = shift||return;
 
@@ -314,11 +327,31 @@ sub slurp_file { # individual lines in list context, entire file in scalar conte
 	return <$fh>;
 }
 
+
 sub spit_file {
 	my ($file, $content) = @_;
 	open my $fh, ">", $file or die "Can't open $file: $!\n";
 	print $fh $content;
 	close $fh or die "Error closing $file: $!";
 }
+
+
+sub profile_datafiles {
+	my ($filename) = @_;
+	croak "No filename specified" unless $filename;
+	my @profile_datafiles = glob("$filename*");
+	# sort to ensure datafile without pid suffix is first
+	@profile_datafiles = sort @profile_datafiles;
+	return @profile_datafiles; # count in scalar context
+}
+
+sub unlink_old_profile_datafiles {
+	my ($filename) = @_;
+	my @profile_datafiles = profile_datafiles($filename);
+	warn "Unlinking old @profile_datafiles\n"
+		if @profile_datafiles and $opts{v};
+	1 while unlink @profile_datafiles;
+}
+
 
 # vim:ts=2:sw=2
