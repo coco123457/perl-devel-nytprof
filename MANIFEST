@@ -26,9 +26,6 @@ t/test02.x
 t/test03.p
 t/test03.v
 t/test03.x
-t/test04.p
-t/test04.v
-t/test04.x
 t/test05.p
 t/test05.v
 t/test05.x
@@ -68,6 +65,9 @@ t/test14.x
 t/test15.p
 t/test15.v
 t/test15.x
+t/test30-fork.0.p
+t/test30-fork.0.v
+t/test30-fork.0.x
 t/test50-disable.p
 t/test50-disable.x
 test.pl
