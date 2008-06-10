@@ -137,8 +137,12 @@ nytprofhtml - creates a very cool HTML report
 
 I<WARNING: ignoring these settings may cause unintended side effects in code that might fork>
 
-The behavior of Devel::NYTProf may be modified substantially through the use of
-a few environment variables.
+The behavior of Devel::NYTProf may be modified substantially by setting the 
+environment variable C<NYTPROF>.  It is possible to use this environment
+variable to effect multiple setting by separating the values with a C<:>.  For
+example:
+
+    export NYTPROF=allowfork:trace=10
 
 =over 4
 
