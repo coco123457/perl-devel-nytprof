@@ -141,7 +141,7 @@ print_header(pTHX) {
 	time_t basetime = PL_basetime;
 	unsigned int ticks = (usecputime) ? CLOCKS_PER_SEC : 1000000;
 
-	assert(out != NULL)
+	assert(out != NULL);
 	/* File header with "magic" string, with file major and minor version */
 	fprintf(out, "NYTProf %d %d\n", 1, 0);
 	/* Human readable comments and attributes follow
