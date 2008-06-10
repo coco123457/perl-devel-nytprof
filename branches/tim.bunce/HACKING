@@ -180,7 +180,7 @@ Add @INC to data file so reports can be made more readable by removing
 
 Add perl version $] to data file.
 
-Intercept all opcodes that may fork (ie fork, open, others?)
+Intercept all opcodes that may fork (ie fork, open, system, others?)
 	and fflush before executing the op (so fpurge isn't strictly required)
   and reinit_if_forked() afterwards (risk of missing a fork does by XS?)
 
