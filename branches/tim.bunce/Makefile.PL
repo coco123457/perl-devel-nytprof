@@ -129,6 +129,8 @@ EOD
 
 $INCLUDE = $stdio_dir if defined $stdio_dir;
 $INCLUDE = $stdio_ext_dir if defined $stdio_ext_dir;
+my $include_string = "-I.";
+$include_string .= $INCLUDE if defined $INCLUDE;
 my $DEFINE = '-DHAS'.uc($fpurge);
 $DEFINE .= ' -DHAS_STDIO_EXT_H' if defined $stdio_ext_dir;
 
@@ -152,7 +154,7 @@ WriteMakefile(
 													'bin/nytprofcsv' => '$(INST_MAN1DIR)/nytprofcsv.1' },
     DEFINE            => $DEFINE, # e.g., '-DHAVE_SOMETHING'
     												# e.g., '-I. -I/usr/include/other'
-    INC               => "-I. -I$INCLUDE", # e.g., '-I. -I/usr/include/other'
+    INC               => $include_string, # e.g., '-I. -I/usr/include/other'
 		clean							=> { 
 			FILES	=> "nytprof.out profiler t/nytprof.out t/profiler t/test*.rdt.new t/auto"
 		},
