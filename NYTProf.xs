@@ -1455,8 +1455,10 @@ _finish(...)
 		write_sub_callers(aTHX);
 		fputc('p', out); /* mark end of profile data for this pid */
 		output_int(last_pid);
+		fflush(out);
+		fclose(out);
+		out = NULL;
 	}
-
 
 MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Data
 PROTOTYPES: DISABLE 
