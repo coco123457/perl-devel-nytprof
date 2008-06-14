@@ -113,8 +113,6 @@ void set_option(const char*);
 void open_output_file(pTHX_ char *);
 void reinit_if_forked(pTHX);
 void set_options_from_env();
-void init(pTHX);
-void DEBUG_print_stats(pTHX);
 HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
 															double time, int count, unsigned int fid);
