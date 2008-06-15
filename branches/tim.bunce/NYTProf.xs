@@ -44,8 +44,7 @@
 #elif defined(HAS__FPURGE)
 #define FPURGE(file) __fpurge(file)
 #else
-#undef FPURGE
-#warning "No fpurge function found -- risk of corrupted profile when forking"
+#define FPURGE(file)
 #endif
 
 /* Hash table definitions */
@@ -753,9 +752,7 @@ reinit_if_forked(pTHX) {
 	if (trace_level >= 1)
 		warn("New pid %d (was %d)\n", getpid(), last_pid);
 	last_pid = getpid();
-#ifdef FPURGE
 	FPURGE(out);
-#endif
   /* we don't bother closing the current out fh so if we don't have fpurge
 	* any old pending data that was duplicated by the fork won't be written
 	* until the program exits and that'll be much easier to handle by the reader
