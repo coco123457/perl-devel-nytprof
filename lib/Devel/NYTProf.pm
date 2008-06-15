@@ -179,6 +179,12 @@ system. If you encounter a problem, make sure INCLUDE has the path to stdio.h
 and ext_stdio.h (if present).  See the CPAN Testers results on the distribution 
 page.
 
+=head1 LIMITATIONS
+
+=head2 threads
+
+C<Devel::NYTProf> is not currently thread safe.
+
 =head1 BUGS
 
 Currently processes which fork after initializing the profiler aren't able to
