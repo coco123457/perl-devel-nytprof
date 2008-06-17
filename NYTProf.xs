@@ -45,6 +45,7 @@
 #define FPURGE(file) __fpurge(file)
 #else
 #define FPURGE(file)
+#warning "No fpurge function found -- risk of corrupted profile when forking"
 #endif
 
 /* Hash table definitions */
