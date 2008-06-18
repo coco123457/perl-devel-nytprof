@@ -46,9 +46,14 @@ sub new {
 	my $args = shift || { filename => 'nytprof.out' };
 
 	croak "No file specified (@{[ %$args ]})" unless $args->{filename};
-
-	my $profile = Devel::NYTProf::Data::load_profile_data_from_file(
-									$args->{filename});
+	
+	my @files;
+	if(defined $args->{allowfork}) {
+		@files = glob($args->{filename} . "*");
+	} else {
+		push @files, $args->{filename};
+	}
+	my $profile = Devel::NYTProf::Data::load_profile_data_from_file(\@files);
 	bless $profile => $class;
 
 	return $profile;
