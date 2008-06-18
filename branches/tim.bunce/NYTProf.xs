@@ -126,6 +126,10 @@ HV *sub_callers_hv;
 	assert(out != NULL); fputc('P', out); output_int(getpid()); output_int(getppid()); \
 } STMT_END
 
+#define END_OUTPUT_PID() STMT_START { \
+	assert(out != NULL); fputc('p', out); output_int(getpid()); fflush(out); \
+} STMT_END
+
 
 /***********************************
  * Devel::NYTProf Functions        *
@@ -271,7 +275,7 @@ write_fids() {
 	Hash_entry *e = hashtable.first_inserted;
 	while (e) {
 		emit_fid(e);
-		e = e->next_inserted;
+		e = (Hash_entry *)e->next_inserted;
 	}
 }
 
@@ -1446,39 +1450,51 @@ _finish(...)
 		warn("_finish pid %d\n", getpid());
 	sv_setiv(PL_DBsingle, 0);
 	DB(aTHX); /* write data for final statement */
-	if (out) {
+	if (out && last_pid == getpid()) {
 		write_sub_line_ranges(aTHX, 0);
 		write_sub_callers(aTHX);
-		fputc('p', out); /* mark end of profile data for this pid */
-		output_int(last_pid);
-		fflush(out);
+		/* mark end of profile data for this pid */
+		END_OUTPUT_PID();
 		fclose(out);
 		out = NULL;
+	}
+
+void
+_finish_pid()
+	PPCODE:
+	if(last_pid == getpid()) {
+		END_OUTPUT_PID();
 	}
 
 MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Data
 PROTOTYPES: DISABLE 
 
 HV*
-load_profile_data_from_file(file=NULL)
-	char *file;
+load_profile_data_from_file(files=NULL)
+	AV *files;
 	CODE:
-	set_options_from_env();
+	int i;
 
-	if (strEQ(file,"STDIN")) {
-		int fd = dup(STDIN_FILENO);
-		if (-1 == fd)
-			croak("Unable to dup stdin: %s", strerror(errno));
-		in = fdopen(fd, "r");
-	}
-	else {
-		in = fopen(file, "rb");
-	}
-	if (in == NULL) {
-		croak("Failed to open input '%s': %s", file, strerror(errno));
-	}
-	RETVAL = load_profile_data_from_stream();
-	fclose(in);
+	set_options_from_env();
+	for(i = 0; i <= av_len(files); i++) {
+		char *file = SvPVX(*av_fetch(files, i, FALSE));
+		if (trace_level)
+                	warn("reading profile date from file %s\n", file);
+		if (strEQ(file,"STDIN")) {
+			int fd = dup(STDIN_FILENO);
+			if (-1 == fd)
+				croak("Unable to dup stdin: %s", strerror(errno));
+			in = fdopen(fd, "r");
+		}
+		else {
+			in = fopen(file, "rb");
+		}
+		if (in == NULL) {
+			croak("Failed to open input '%s': %s", file, strerror(errno));
+		}
+		RETVAL = load_profile_data_from_stream();
+		fclose(in);
+        }
 	OUTPUT:
 	RETVAL
 
