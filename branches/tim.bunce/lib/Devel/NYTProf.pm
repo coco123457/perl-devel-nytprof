@@ -222,4 +222,24 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,
 at your option, any later version of Perl 5 you may have available.
 
+=head1 A BRIEF HISTORY OF PERL PROFILERS
+
+Draft. Will be expanded.
+
+Subroutine-level profilers:
+
+  Devel::DProf        | 1995-10-31| ILYAZ
+  Devel::AutoProfiler | 2002-04-07| GSLONDON
+  Devel::Profiler     | 2002-05-20| SAMTREGAR
+  Devel::Profile      | 2003-04-13| JAW
+  Devel::DProfLB      | 2006-05-11| JAW
+  Devel::WxProf       | 2008-04-14| MKUTTER
+
+Statement-level profilers:
+
+  Devel::SmallProf    | 1997-07-30| ASHTED
+  Devel::FastProf     | 2005-09-20| SALVA
+  Devel::NYTProf      | 2008-03-04| AKAPLAN
+  Devel::Profit       | 2008-05-19| LBROCARD
+
 =cut
