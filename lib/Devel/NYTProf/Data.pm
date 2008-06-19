@@ -19,6 +19,10 @@ Devel::NYTProf::Data - L<Devel::NYTProf> data loading and manipulation
 Reads a profile data file written by L<Devel::NYTProf>, aggregates the
 contents, and returns the results as a blessed data structure.
 
+Access to the data should be via methods in this class to avoid breaking
+encapsulation (and thus breaking your code when the data structures change in
+future versions).
+
 =head1 METHODS
 
 =cut
@@ -99,7 +103,7 @@ The types of data present can depend on the options used when profiling.
     sub_caller => {
         main::bar => {
             1 => {
-                12 => 1
+                12 => 1 # main::bar was called by fid 1, line 12, 1 time.
                 16 => 1
                 3 => 2
             }
@@ -278,6 +282,101 @@ sub _filename_to_fid {
 }
 
 
+=head2 subs_defined_in_file
+
+  $subs_defined_hash = $profile->subs_defined_in_file( $file );
+
+Returns a reference to a hash containing information about subroutines defined
+in a source file.  The $file argument can be an integer file id (fid) or a file path.
+Returns undef if the profile contains no C<sub_caller> data for the $file.
+
+The keys are fully qualifies subroutine names and the corresponding value is a
+hash reference containing information about the subroutine.
+
+The hash also contains integer keys corresponding to the first line of the
+subroutine. The corresponding value is a reference to an array. The array
+contains a hash ref for each of the subroutines defined on that line.
+
+For example, if the file 'foo.pl' defines one subroutine, called pkg1::foo, on
+lines 42 thru 49, then $profile->line_calls_for_file( 'foo.pl' ) would return:
+
+	{
+		'pkg1::foo' => {
+			subname => 'pkg1::foo',
+			fid => 7,
+			first_line => 42,
+			last_line => 49,
+			callers => { ... },
+		},
+		42 => [ <ref to same hash as above> ]
+	}
+
+The C<callers> item is a ref to a hash that describes locations from which the
+subroutine was called. For example:
+
+  callers => {
+		3 => {       # calls from fid 3
+				12 => 1, # sub was called from fid 3, line 12, 1 time.
+				16 => 1,
+				3 => 2,
+		},
+		8 => { ... }
+	}
+
+=cut
+
+sub subs_defined_in_file {
+	my ($self, $fid) = @_;
+
+	$fid = $self->resolve_fid($fid);
+	my $sub_fid_line = $self->{sub_fid_line}
+		or return;
+
+	my %subs;
+	while ( my ($sub, $fid_line_info) = each %$sub_fid_line) {
+		next if $fid_line_info->[0] != $fid;
+		my (undef, $first, $last) = @$fid_line_info;
+		$subs{ $sub } = {
+			subname => $sub,
+			fid => $fid,
+			first_line => $first,
+			last_line => $last,
+			callers => $self->{sub_caller}->{$sub},
+		};
+	}
+
+	# add in the first-line-number keys
+	push @{ $subs{ $_->{first_line} } }, $_
+		for values %subs;
+
+	return \%subs;
+}
+
+
+=head2 subname_at_file_line
+
+    @subname = $profile->subname_at_file_line($file, $line_number);
+    $subname = $profile->subname_at_file_line($file, $line_number);
+
+=cut
+
+sub subname_at_file_line {
+	my ($self, $fid, $line) = @_;
+	# XXX could be done more efficiently
+	my $subs = $self->subs_defined_in_file($fid);
+	my @subname;
+	for my $sub_info (values %$subs) {
+		next if ref $sub_info ne 'HASH';
+		next if $sub_info->{first_line} > $line
+				 or $sub_info->{last_line}  < $line;
+		push @subname, $sub_info->{subname};
+	}
+	return @subname if wantarray;
+	carp "Multiple subs at $fid line $line (@subname) but subname_at_file_line called in scalar context"
+		if @subname > 1;
+	return $subname[0];
+}
+
 =head2 file_line_range_of_sub
 
     ($file, $fid, $first, $last) = $profile->file_line_range_of_sub("main::foo");
@@ -368,12 +467,12 @@ sub resolve_fid {
   $line_calls_hash = $profile->line_calls_for_file( $file );
 
 Returns a reference to a hash containing information about subroutine calls
-made at individual lines within a source file.  lines in the file.  The $file
+made at individual lines within a source file. The $file
 argument can be an integer file id (fid) or a file path. Returns undef if the
-profile contains no C<sub_caller> data.
+profile contains no C<sub_caller> data for the $file.
 
 The keys of the returned hash are line numbers. The values are references to
-hashes with fully qualifies subroutine names as keys and integer call counts as
+hashes with fully qualified subroutine names as keys and integer call counts as
 values.
 
 For example, if the following was line 42 of a file C<foo.pl>:
