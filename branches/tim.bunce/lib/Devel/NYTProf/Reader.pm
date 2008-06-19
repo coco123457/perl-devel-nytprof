@@ -365,6 +365,7 @@ sub report {
 		}
 
 		my $line_calls_hash = $profile->line_calls_for_file( $filestr );
+		my $subs_defined_hash = $profile->subs_defined_in_file( $filestr );
 
 		my $LINE = 1;	# actual line number. PATTERN variable, DO NOT CHANGE
 		foreach my $line (<IN>) {
@@ -373,6 +374,7 @@ sub report {
 				$line =~ s/$regexp->{pattern}/$regexp->{replace}/g;
 			}
 			my $makes_calls_to = $line_calls_hash->{$LINE} || {};
+			my $subs_defined = $subs_defined_hash->{$LINE} || [];
 
 			# can we get the main package for this file from this line?
 			{ 
@@ -396,9 +398,9 @@ sub report {
 					if ($hash->{value}) {
 						print OUT $hash->{func}($hash->{value}, 
 											$totalsByLine{$LINE}->{$hash->{value}},
-											$statistics{$hash->{value}}, $LINE, $line, $profile, $makes_calls_to);
+											$statistics{$hash->{value}}, $LINE, $line, $profile, $subs_defined, $makes_calls_to);
 					} else {
-						print OUT $hash->{func}($hash->{value}, $LINE, $line, $profile, $makes_calls_to);
+						print OUT $hash->{func}($hash->{value}, $LINE, $line, $profile, $subs_defined, $makes_calls_to);
 					}
 					next;
 				}
