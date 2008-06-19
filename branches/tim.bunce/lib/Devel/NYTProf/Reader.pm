@@ -254,6 +254,23 @@ sub output_dir {
 sub report {
 	my $self = shift;
 
+	my $profile = $self->{profile};
+
+	# pre-calculate some data so it can be cross-referenced
+	foreach my $filestr (keys %{$self->{data}}) {
+
+		# discover file path
+		my $fname = $filestr;
+		foreach (@INC) {
+			$_ = '\.' if ($_ eq '.');
+			$fname =~ s/^$_//;
+		}
+		$fname =~ s#^[/\\]##o;		# nuke leading / or \
+		$fname =~ s#[/\\]#-#go; # replace / and \ with html safe -
+
+		$self->{filestats}->{$filestr}->{html_safe} = $fname;
+	}
+
 	foreach my $filestr (keys %{$self->{data}}) {
 
 		# test file modification date. Files that have been touched after the
@@ -306,17 +323,6 @@ sub report {
 					calculate_median_absolute_deviation($totalsAccum{'time/call'}),
 		);
 
-		# discover file path
-		my $fname = $filestr;
-		foreach (@INC) {
-			$_ = '\.' if ($_ eq '.');
-			$fname =~ s/^$_//;
-		}
-		$fname =~ s#^[/\\]##o;		# nuke leading / or \
-		$fname =~ s#[/\\]#-#go; # replace / and \ with html safe -
-
-		$self->{filestats}->{$filestr}->{html_safe} = $fname;
-
 		# localize header and footer for variable replacement
 		my $header = $self->{header};
 		my $footer = $self->{footer};
@@ -340,6 +346,7 @@ sub report {
 		}
 
 		# open output file
+		my $fname = $self->{filestats}->{$filestr}->{html_safe};
 		open (OUT, "> $self->{output_dir}/$fname$self->{suffix}") or
 			confess "Unable to open $self->{output_dir}/$fname$self->{suffix} "
 						."for writing: $!\n";
@@ -357,12 +364,15 @@ sub report {
 			next;
 		}
 
+		my $line_calls_hash = $profile->line_calls_for_file( $filestr );
+
 		my $LINE = 1;	# actual line number. PATTERN variable, DO NOT CHANGE
 		foreach my $line (<IN>) {
 			chomp $line;
 			foreach my $regexp (@{$self->{user_regexp}}) {
 				$line =~ s/$regexp->{pattern}/$regexp->{replace}/g;
 			}
+			my $makes_calls_to = $line_calls_hash->{$LINE} || {};
 
 			# can we get the main package for this file from this line?
 			{ 
@@ -386,9 +396,9 @@ sub report {
 					if ($hash->{value}) {
 						print OUT $hash->{func}($hash->{value}, 
 											$totalsByLine{$LINE}->{$hash->{value}},
-											$statistics{$hash->{value}}, $LINE);
+											$statistics{$hash->{value}}, $LINE, $line, $profile, $makes_calls_to);
 					} else {
-						print OUT $hash->{func}($hash->{value}, $LINE);
+						print OUT $hash->{func}($hash->{value}, $LINE, $line, $profile, $makes_calls_to);
 					}
 					next;
 				}
@@ -418,6 +428,22 @@ sub report {
 		close OUT;
 	}
 }
+
+
+sub href_for_sub {
+	my ($self, $sub) = @_;
+	my ($file, $fid, $first, $last) = $self->{profile}->file_line_range_of_sub($sub);
+	my $stats = $self->get_file_stats();
+	my $file_stats = $stats->{$file};
+	if (!$file_stats) {
+		Carp::cluck("Sub '$sub' file '$file' not in stats");
+		#warn "[@{[ keys %$stats ]}]\n";
+		return "#sub unknown";
+	}
+	my $html_safe = $file_stats->{html_safe};
+	return "$html_safe.html#$first";
+}
+
 
 1;
 __END__
