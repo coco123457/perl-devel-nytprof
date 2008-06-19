@@ -57,7 +57,11 @@ sub new {
 	} else {
 		push @files, $args->{filename};
 	}
-	my $profile = Devel::NYTProf::Data::load_profile_data_from_file(\@files);
+        my $profile;
+
+        for my $file (@files) {
+		$profile = Devel::NYTProf::Data::load_profile_data_from_file($file);
+	}
 	bless $profile => $class;
 
 	return $profile;

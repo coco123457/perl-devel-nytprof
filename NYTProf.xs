@@ -1498,31 +1498,28 @@ MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Data
 PROTOTYPES: DISABLE 
 
 HV*
-load_profile_data_from_file(files=NULL)
-	AV *files;
+load_profile_data_from_file(file=NULL)
+	char *file;
 	CODE:
-	int i;
 
 	set_options_from_env();
-	for(i = 0; i <= av_len(files); i++) {
-		char *file = SvPVX(*av_fetch(files, i, FALSE));
-		if (trace_level)
-                	warn("reading profile date from file %s\n", file);
-		if (strEQ(file,"STDIN")) {
-			int fd = dup(STDIN_FILENO);
-			if (-1 == fd)
-				croak("Unable to dup stdin: %s", strerror(errno));
-			in = fdopen(fd, "r");
-		}
-		else {
-			in = fopen(file, "rb");
-		}
-		if (in == NULL) {
-			croak("Failed to open input '%s': %s", file, strerror(errno));
-		}
-		RETVAL = load_profile_data_from_stream();
-		fclose(in);
-        }
+	if (trace_level)
+               	warn("reading profile date from file %s\n", file);
+	if (strEQ(file,"STDIN")) {
+		int fd = dup(STDIN_FILENO);
+		if (-1 == fd)
+			croak("Unable to dup stdin: %s", strerror(errno));
+		in = fdopen(fd, "r");
+	}
+	else {
+		in = fopen(file, "rb");
+	}
+	if (in == NULL) {
+		croak("Failed to open input '%s': %s", file, strerror(errno));
+	}
+	RETVAL = load_profile_data_from_stream();
+	fclose(in);
+       
 	OUTPUT:
 	RETVAL
 
