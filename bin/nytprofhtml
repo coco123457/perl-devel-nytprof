@@ -92,8 +92,8 @@ $reporter->set_param('datastart', "<table border=1 cellpadding=0>
 $reporter->set_param('footer', '</table></body></html>');
 
 $reporter->set_param('linestart', {
-    func => sub { my ($value, $line) = @_;
-      sprintf qq{<tr><td class="h"><a name="%d"></a>%d</td>}, $line, $line;
+    func => sub { my ($value, $linenum, $linesrc) = @_;
+      sprintf qq{<tr><td class="h"><a name="%d"></a>%d</td>}, $linenum, $linenum;
     },
 });
 
@@ -103,9 +103,25 @@ $reporter->set_param('linestart', {
 #	{start => '<td>', value => 'time', end => '</td>', default => ''});
 #$reporter->set_param('column3', 
 #	{start => '<td>', value => 'time/call', end => '</td>', default => ''});
-$reporter->set_param('column4', 
-	{start => '<td class=\'s\'>', value => 'source', end => '</td>', 
-		default => ''});
+$reporter->set_param('column4', {
+    func => sub { my ($value, $linenum, $linesrc, $profile, $makes_calls_to) = @_;
+      my $ws = ($linesrc =~ m/^((?:&nbsp;)+)/) ? $1 : '';
+
+      my $prologue = '';
+
+      my $epilogue = '';
+      if (%$makes_calls_to) {
+        $epilogue = join "\n", map {
+          sprintf qq{$ws# <a href="%s">%s</a> called %d times},
+            $reporter->href_for_sub($_),
+            $_, $makes_calls_to->{$_}
+        } sort keys %$makes_calls_to;
+        $epilogue = sprintf qq{<div class="calls_to"><pre>%s</pre></div>}, $epilogue;
+      }
+      sprintf qq{<td class="s">%s%s%s</td>}, $prologue, $linesrc, $epilogue;
+    },
+});
+
 
 #$reporter->set_param('linestart', {func => \&myfunc});
 $reporter->set_param('column1', 

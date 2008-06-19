@@ -278,6 +278,48 @@ sub _filename_to_fid {
 }
 
 
+=head2 file_line_range_of_sub
+
+    ($file, $fid, $first, $last) = $profile->file_line_range_of_sub("main::foo");
+
+Returns the filename, fid, and first and last line numbers for the specified
+subroutine (which must be fully qualified with a package name).
+
+Returns an empty list if the subroutine name is not in the profile data.
+
+The $fid return is the 'original' fid associated with the file the subroutine was created in.
+
+The $file returned is the source file that defined the subroutine.
+
+Where is a subroutine is defined within a string eval, for example, the fid
+will be the pseudo-fid for the eval, and the $file will be the filename that
+executed the eval.
+
+=cut
+
+sub file_line_range_of_sub {
+	my ($self, $sub) = @_;
+
+	my $sub_fid_line = $self->{sub_fid_line}{$sub}
+			or return; # no such sub
+	my ($fid, $first, $last) = @$sub_fid_line;
+
+	my $file = $self->{fid_filename}->[$fid];
+	while (ref $file eq 'ARRAY') {
+		# eg string eval
+		# eg [ "(eval 6)[/usr/local/perl58-i/lib/5.8.6/Benchmark.pm:634]", 2, 634 ]
+		warn sprintf "%s: fid %d -> %d for %s\n",
+			$sub, $fid, $file->[1], $file->[0];
+		$first = $last = $file->[2] if 1; # XXX control via param?
+		# follow next link in chain
+		my $outer_fid = $file->[1];
+		$file = $self->{fid_filename}->[$outer_fid];
+	}
+
+	return ($file, $fid, $first, $last);
+}
+
+
 =head2 resolve_fid
 
   $fid = $profile->resolve_fid( $file );
