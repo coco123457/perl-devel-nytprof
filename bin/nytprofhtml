@@ -91,8 +91,11 @@ $reporter->set_param('datastart', "<table border=1 cellpadding=0>
 
 $reporter->set_param('footer', '</table></body></html>');
 
-$reporter->set_param('linestart',
-	{start => '<tr><td class="h">', value=> 'line', end => '</td>'});
+$reporter->set_param('linestart', {
+    func => sub { my ($value, $line) = @_;
+      sprintf qq{<tr><td class="h"><a name="%d"></a>%d</td>}, $line, $line;
+    },
+});
 
 #$reporter->set_param('column1', 
 #	{start => '<td>', value => 'calls', end => '</td>', default => ''});
