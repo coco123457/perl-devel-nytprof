@@ -386,9 +386,9 @@ sub report {
 					if ($hash->{value}) {
 						print OUT $hash->{func}($hash->{value}, 
 											$totalsByLine{$LINE}->{$hash->{value}},
-											$statistics{$hash->{value}});
+											$statistics{$hash->{value}}, $LINE);
 					} else {
-						print OUT $hash->{func}($hash->{value});
+						print OUT $hash->{func}($hash->{value}, $LINE);
 					}
 					next;
 				}
