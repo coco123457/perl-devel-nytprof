@@ -35,7 +35,7 @@ my %SKIP_TESTS = (
 
 my %opts;
 GetOptions(\%opts,
-	qw/p=s I=s v|verbose d|debug/
+	qw/p=s I=s v|verbose d|debug html/
 ) or exit 1;
 
 $opts{v} ||= $opts{d};
@@ -65,10 +65,9 @@ my $path_sep = $Config{path_sep} || ':';
 if( -d '../blib' ){
 	unshift @INC, '../blib/arch', '../blib/lib';
 }
-my $fprofcsv = './bin/nytprofcsv';
-if( -d '../bin' ) {
-	$fprofcsv = ".$fprofcsv";
-}
+my $bindir = (grep { -d } qw(./bin ../bin))[0]; 
+my $fprofcsv  = "$bindir/nytprofcsv";
+my $fprofhtml = "$bindir/nytprofhtml";
 
 my $perl5lib = $opt_include || join( $path_sep, @INC );
 my $perl = $opt_perl || $^X;
@@ -113,6 +112,10 @@ foreach my $test (@tests) {
 		}
 		elsif ($type eq 'x') {
 			verify_report($test, $test_datafile);
+
+			if ($opts{html}) {
+				run_command("$perl $fprofhtml --file=$profile_datafile");
+			}
 		}
 		else {
 			warn "Unrecognized extension '$type' on test file '$test'\n";

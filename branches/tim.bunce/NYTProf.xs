@@ -1455,7 +1455,8 @@ _finish(...)
 		write_sub_callers(aTHX);
 		/* mark end of profile data for this pid */
 		END_OUTPUT_PID();
-		fclose(out);
+		if (-1 == fclose(out))
+			warn("Error closing profile data file: %s", strerror(errno));
 		out = NULL;
 	}
 

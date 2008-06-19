@@ -180,9 +180,16 @@ Add @INC to data file so reports can be made more readable by removing
 
 Add perl version $] to data file.
 
-Intercept all opcodes that may fork (ie fork, open, system, others?)
+Add size and mtime of fid to data file.
+
+Intercept all opcodes that may fork and run perl code in the child
+	ie fork, open, entersub (ie xs), others?
 	and fflush before executing the op (so fpurge isn't strictly required)
-  and reinit_if_forked() afterwards (risk of missing a fork does by XS?)
+  and reinit_if_forked() afterwards
+	add option to force reinit_if_forked check per stmt just-in-case
+
+Add seperate utility to merge profile files and write out a new one
+	containing the merged data
 
 Add constants to Data.pm for the array indexes
 0=time_spent
