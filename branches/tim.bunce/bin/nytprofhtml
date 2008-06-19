@@ -71,6 +71,7 @@ my $reporter = new Devel::NYTProf::Reader($opt{file});
 # place to store this crap
 $reporter->output_dir($opt{out});
 
+
 # set formatting for html
 $reporter->set_param('header', get_header("Profile: !~FILENAME~!").
 "<body> <h1>File Profile</h1> <table><tr>
@@ -85,9 +86,24 @@ $reporter->set_param('taintmsg',
 <div class='warn'>The source file used to generate this report was modified
 after the profiler database was generated. The database might be out of sync, you should regenerate it.  This page might not make any sense!</div><br/>\n");
 
-$reporter->set_param('datastart', "<table border=1 cellpadding=0>
-<tr><th>Line</th><th>Calls</th><th>Time</th><th>Times/Call</th><th>Code</th>
-</tr>\n");
+$reporter->set_param('datastart', sub {
+    my ($profile, $filestr) = @_;
+    my $subs_defined_hash = $profile->subs_defined_in_file( $filestr, 0 );
+    my @subs = sort {
+      $a->{first_line} <=> $b->{first_line}
+    } values %$subs_defined_hash;
+
+    my $sub_links = join "<br>\n", map {
+      sprintf qq{sub <a href="#%d">%s</a> lines %d&mdash;%d},
+        $_->{first_line}, $_->{subname}, $_->{first_line}, $_->{last_line};
+    } @subs;
+
+    return qq{<div style="font-family: monospace">$sub_links</div><br>
+      <table border=1 cellpadding=0>
+      <tr><th>Line</th><th>Calls</th><th>Time</th><th>Times/Call</th><th>Code</th>
+      </tr>\n
+    };
+});
 
 $reporter->set_param('footer', '</table></body></html>');
 
@@ -106,11 +122,12 @@ $reporter->set_param('linestart', {
 $reporter->set_param('column4', {
     func => sub {
       my ($value, $linenum, $linesrc, $profile, $subs, $calls) = @_;
+
       my @prologue;
       for my $sub_info (@$subs) {
         my $callers = $sub_info->{callers};
         next unless $callers && %$callers;
-        push @prologue, sprintf "# %s called by:", $sub_info->{subname};
+        push @prologue, sprintf "# %s called:", $sub_info->{subname};
         my @callers;
         while ( my ($fid, $fid_line_info) = each %$callers ) {
           push @callers, [ $fid, $_, $fid_line_info->{$_} ]
@@ -119,25 +136,28 @@ $reporter->set_param('column4', {
         # order by most frequent caller first
         for my $caller (sort { $b->[2] <=> $a->[2] } @callers) {
           my ($fid, $line, $count) = @$caller;
-          my $subname = $profile->subname_at_file_line($fid, $line);
+          my $subname = join(" or ", $profile->subname_at_file_line($fid, $line)) || "$fid:line";
           my $href = '';
+          my $caller_filename = $profile->fid_filename($fid);
           push @prologue, sprintf q{# %d times by %s at <a href="%s#%d">line %d</a> of %s},
-                $count, $subname, $href, $line, $line, $profile->{fid_filename}->[$fid];
+                $count, $subname, $href, $line, $line, $caller_filename;
         }
       }
       my $prologue = join("\n",@prologue);
-      $prologue = sprintf qq{<div class="calls_from"><pre>%s</pre></div>}, $prologue
+      $prologue = sprintf qq{<div class="calls">%s</div>}, $prologue
         if $prologue;
 
       my $epilogue = '';
       if (%$calls) {
         my $ws = ($linesrc =~ m/^((?:&nbsp;)+)/) ? $1 : '';
+        my @counts;
         $epilogue = join "\n", map {
+          push @counts, $calls->{$_};
           sprintf qq{$ws# <a href="%s">%s</a> called %d times},
             $reporter->href_for_sub($_),
             $_, $calls->{$_}
         } sort keys %$calls;
-        $epilogue = sprintf qq{<div class="calls_to"><pre>%s</pre></div>}, $epilogue;
+        $epilogue = sprintf qq{<div class="calls">%s</div>}, $epilogue;
       }
 
       sprintf qq{<td class="s">%s%s%s</td>}, $prologue, $linesrc, $epilogue;
@@ -376,7 +396,7 @@ h1, h3 {
 	-moz-border-radius: 10px;
 }
 
-a { color: #000000; }
+a:hover { color: red; }
 a:visited { color: #333333; }
 
 table { 
@@ -449,6 +469,22 @@ pre,.s {
 	text-align: center;
 	padding: 5px 0;
 }
+
+.calls {
+  display: block;
+	color: grey;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  text-decoration: none;
+}
+.calls:hover {
+	background-color: #e8e8e8;
+	color: black;
+}
+.calls       a       { color: grey;  text-decoration: none; }
+.calls:hover a       { color: black; text-decoration: underline; }
+.calls:hover a:hover { color: red; }
+
 __END__
 
 =head1 NAME

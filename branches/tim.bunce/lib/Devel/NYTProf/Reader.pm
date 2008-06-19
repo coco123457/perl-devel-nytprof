@@ -180,6 +180,17 @@ sub set_param {
 	undef;
 }
 
+
+sub get_param {
+	my ($self, $param, $code_args) = @_;
+	my $value = $self->{$param};
+	if (ref $value eq 'CODE') {
+		$code_args ||= [];
+		$value = $value->(@$code_args);
+	}
+	return $value;
+}
+
 ##
 sub add_regexp {
 	my ($self, $pattern, $replace) = @_;
@@ -323,12 +334,15 @@ sub report {
 					calculate_median_absolute_deviation($totalsAccum{'time/call'}),
 		);
 
+		my $line_calls_hash = $profile->line_calls_for_file( $filestr );
+		my $subs_defined_hash = $profile->subs_defined_in_file( $filestr, 1 );
+
 		# localize header and footer for variable replacement
-		my $header = $self->{header};
-		my $footer = $self->{footer};
-		my $taintmsg = $self->{taintmsg};
-		my $datastart = $self->{datastart};
-		my $dataend = $self->{dataend};
+		my $header    = $self->get_param('header',    [ $profile, $filestr ]);
+		my $footer    = $self->get_param('footer',    [ $profile, $filestr ]);
+		my $taintmsg  = $self->get_param('taintmsg',  [ $profile, $filestr ]);
+		my $datastart = $self->get_param('datastart', [ $profile, $filestr ]);
+		my $dataend   = $self->get_param('dataend',   [ $profile, $filestr ]);
 		my $FILE = $filestr;
 		foreach my $transform (@{$self->{replacements}}) {
 			my $pattern = $transform->{pattern};
@@ -363,9 +377,6 @@ sub report {
 			."or ensure \@INC is correct.\n";
 			next;
 		}
-
-		my $line_calls_hash = $profile->line_calls_for_file( $filestr );
-		my $subs_defined_hash = $profile->subs_defined_in_file( $filestr );
 
 		my $LINE = 1;	# actual line number. PATTERN variable, DO NOT CHANGE
 		foreach my $line (<IN>) {
