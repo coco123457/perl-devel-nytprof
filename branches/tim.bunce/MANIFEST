@@ -8,6 +8,7 @@ README
 bin/nytprofcsv
 bin/nytprofhtml
 lib/Devel/NYTProf.pm
+lib/Devel/NYTProf/Apache.pm
 lib/Devel/NYTProf/Core.pm
 lib/Devel/NYTProf/Data.pm
 lib/Devel/NYTProf/Reader.pm
