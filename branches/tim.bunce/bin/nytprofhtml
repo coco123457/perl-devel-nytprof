@@ -93,6 +93,7 @@ $reporter->set_param('datastart', sub {
       $a->{first_line} <=> $b->{first_line}
     } values %$subs_defined_hash;
 
+    # XXX would be nice to color code these according to the overall time spent in the sub
     my $sub_links = join "<br>\n", map {
       sprintf qq{sub <a href="#%d">%s</a> lines %d&mdash;%d},
         $_->{first_line}, $_->{subname}, $_->{first_line}, $_->{last_line};
@@ -137,10 +138,11 @@ $reporter->set_param('column4', {
         for my $caller (sort { $b->[2] <=> $a->[2] } @callers) {
           my ($fid, $line, $count) = @$caller;
           my $subname = join(" or ", $profile->subname_at_file_line($fid, $line)) || "$fid:line";
-          my $href = '';
+          my $filename = $profile->fid_filename($fid);
+          my $href = $reporter->get_file_stats()->{$filename}{html_safe} || "unknown";
           my $caller_filename = $profile->fid_filename($fid);
           push @prologue, sprintf q{# %d times by %s at <a href="%s#%d">line %d</a> of %s},
-                $count, $subname, $href, $line, $line, $caller_filename;
+                $count, $subname, "$href.html", $line, $line, $caller_filename;
         }
       }
       my $prologue = join("\n",@prologue);
