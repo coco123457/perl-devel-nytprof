@@ -284,7 +284,7 @@ sub _filename_to_fid {
 
 =head2 subs_defined_in_file
 
-  $subs_defined_hash = $profile->subs_defined_in_file( $file );
+  $subs_defined_hash = $profile->subs_defined_in_file( $file, $include_lines );
 
 Returns a reference to a hash containing information about subroutines defined
 in a source file.  The $file argument can be an integer file id (fid) or a file path.
@@ -293,9 +293,10 @@ Returns undef if the profile contains no C<sub_caller> data for the $file.
 The keys are fully qualifies subroutine names and the corresponding value is a
 hash reference containing information about the subroutine.
 
-The hash also contains integer keys corresponding to the first line of the
-subroutine. The corresponding value is a reference to an array. The array
-contains a hash ref for each of the subroutines defined on that line.
+If $include_lines is true then the hash also contains integer keys
+corresponding to the first line of the subroutine. The corresponding value is a
+reference to an array. The array contains a hash ref for each of the
+subroutines defined on that line.
 
 For example, if the file 'foo.pl' defines one subroutine, called pkg1::foo, on
 lines 42 thru 49, then $profile->line_calls_for_file( 'foo.pl' ) would return:
@@ -326,7 +327,7 @@ subroutine was called. For example:
 =cut
 
 sub subs_defined_in_file {
-	my ($self, $fid) = @_;
+	my ($self, $fid, $incl_lines) = @_;
 
 	$fid = $self->resolve_fid($fid);
 	my $sub_fid_line = $self->{sub_fid_line}
@@ -345,9 +346,10 @@ sub subs_defined_in_file {
 		};
 	}
 
-	# add in the first-line-number keys
-	push @{ $subs{ $_->{first_line} } }, $_
-		for values %subs;
+	if ($incl_lines) { # add in the first-line-number keys
+		push @{ $subs{ $_->{first_line} } }, $_
+			for values %subs;
+	}
 
 	return \%subs;
 }
@@ -363,19 +365,39 @@ sub subs_defined_in_file {
 sub subname_at_file_line {
 	my ($self, $fid, $line) = @_;
 	# XXX could be done more efficiently
-	my $subs = $self->subs_defined_in_file($fid);
+	my $subs = $self->subs_defined_in_file($fid, 0);
 	my @subname;
 	for my $sub_info (values %$subs) {
-		next if ref $sub_info ne 'HASH';
 		next if $sub_info->{first_line} > $line
 				 or $sub_info->{last_line}  < $line;
 		push @subname, $sub_info->{subname};
 	}
+	@subname = sort { length($a) <=> length($b) } @subname;
 	return @subname if wantarray;
 	carp "Multiple subs at $fid line $line (@subname) but subname_at_file_line called in scalar context"
 		if @subname > 1;
 	return $subname[0];
 }
+
+
+sub fid_filename {
+	my ($self, $fid) = @_;
+
+	my $file = $self->{fid_filename}->[$fid];
+
+	while (ref $file eq 'ARRAY') {
+		# eg string eval
+		# eg [ "(eval 6)[/usr/local/perl58-i/lib/5.8.6/Benchmark.pm:634]", 2, 634 ]
+		warn sprintf "fid_filename: fid %d -> %d for %s\n",
+			$fid, $file->[1], $file->[0];
+		# follow next link in chain
+		my $outer_fid = $file->[1];
+		$file = $self->{fid_filename}->[$outer_fid];
+	}
+
+	return $file;
+}
+
 
 =head2 file_line_range_of_sub
 
