@@ -535,6 +535,20 @@ visit_contexts(pTHX_ UV stop_at, int (*callback)(pTHX_ PERL_CONTEXT *cx,
 }
 
 
+static int
+_cop_in_same_file(COP *a, COP *b)
+{
+  int same = 0;
+	if (OutCopFILE(a) == OutCopFILE(b))
+		same = 1;
+	else
+	/* fallback to strEQ, surprisingly common (check why) XXX expensive */
+  if (strEQ(OutCopFILE(a), OutCopFILE(b)))
+		same = 1;
+  return same;
+}
+
+
 int
 _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 {
@@ -544,48 +558,61 @@ _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 		if (CxTYPE(cx) == CXt_SUB) {
 				if (PL_debstash && CvSTASH(cx->blk_sub.cv) == PL_debstash)
 					return 0; /* skip subs in DB package */
+
+				near_cop = start_cop_of_context(aTHX_ cx);
+
+				/* only use the cop if it's in the same file */
+				if (_cop_in_same_file(near_cop, PL_curcop)) {
+					last_sub_line = CopLINE(near_cop);
+					/* treat sub as a block if we've not found a block yet */
+					if (!last_block_line)
+							last_block_line = last_sub_line;
+				}
+
 				if (trace_level >= 4) {
 					GV *sv = CvGV(cx->blk_sub.cv);
-					warn("\t%s %s\n", block_type[CxTYPE(cx)], (sv) ? GvNAME(sv) : "");
+					warn("\tat %d: block %d sub %d for %s %s\n",
+						last_executed_line, last_block_line, last_sub_line,
+						block_type[CxTYPE(cx)], (sv) ? GvNAME(sv) : "");
 					if (trace_level >= 9)
 						sv_dump((SV*)cx->blk_sub.cv);
 				}
-				near_cop = start_cop_of_context(aTHX_ cx);
-				/* don't use the cop if it's in a different file */
-				if (OutCopFILE(near_cop) != OutCopFILE(PL_curcop)) {
-					return 1; /* stop looking, leave last_sub_line unset */
-				}
 
-				last_sub_line = CopLINE(near_cop);
-				/* treat sub as a block if we've not found a block yet */
-				if (!last_block_line)
-						last_block_line = last_sub_line;
 				return 1;		/* stop looking */
 		}
 
 	/* NULL, EVAL, LOOP, SUBST, BLOCK context */
 	if (trace_level >= 4)
 		warn("\t%s\n", block_type[CxTYPE(cx)]);
+
 	/* if we've got a block line, skip this context and keep looking for a sub */
 	if (last_block_line)
 		return 0;
+
 	/* if we can't get a line number for this context, skip it */
 	if ((near_cop = start_cop_of_context(aTHX_ cx)) == NULL)
 		return 0;
+
 	/* if this context is in a different file... */
-	if (OutCopFILE(near_cop) != OutCopFILE(PL_curcop)) {
+	if (!_cop_in_same_file(near_cop, PL_curcop)) {
 		/* if we started in a string eval ... */
 		if ('(' == *OutCopFILE(PL_curcop)) {
-			last_block_line = last_sub_line = 1;
+			/* give up XXX could do better here */
+			last_block_line = last_sub_line = last_executed_line;
 			return 1;
 		}
 		/* shouldn't happen! */
-		if (trace_level >= 3)
-			warn("%s in different file (%s, %s)", block_type[CxTYPE(cx)], 
+		if (trace_level >= 1)
+			warn("at %d: %s in different file (%s, %s)",
+						last_executed_line, block_type[CxTYPE(cx)], 
 						OutCopFILE(near_cop), OutCopFILE(PL_curcop));
 		return 1; /* stop looking */
 	}
+
 	last_block_line = CopLINE(near_cop);
+	if (trace_level >= 4)
+		warn("\tat %d: block %d for %s\n",
+			last_executed_line, last_block_line, block_type[CxTYPE(cx)]);
 	return 0;
 }
 
