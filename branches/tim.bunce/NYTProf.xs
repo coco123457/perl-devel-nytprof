@@ -1027,7 +1027,7 @@ write_sub_line_ranges(pTHX_ int fids_only) {
 		if (!first_line && !last_line && strstr(sub_name, "::BEGIN"))
 			continue;	/* no point writing these */
 
-		fid = get_file_id(file_lines, first - file_lines, (fids_only) ? 1 : 0);
+		fid = get_file_id(file_lines, first - file_lines, 0);
 		if (!fid)  /* no point in writing subs in files we've not profiled */
 			continue;
 		if (fids_only)  /* caller just wants fids assigned */
@@ -1439,13 +1439,6 @@ void
 init_profiler()
 	CODE:
 		init_profiler(aTHX);
-
-void
-_assign_fids();
-	CODE:
-	/* calls write_sub_line_ranges with fids_only flag true, so this just
-	 * assigns and outputs the fids for all loaded files */
-	write_sub_line_ranges(aTHX_ 1);
 
 void
 enable_profile(...)

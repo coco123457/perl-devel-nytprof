@@ -63,10 +63,6 @@ BEGIN {
 	time only.  This is a new mechanism and the details may change.
 =cut
 
-INIT {
-	_assign_fids()
-}
-
 END {
 	# cleanup
 	#warn sprintf 'END Devel::NYTProf $$=%d\n', $$; # $$ may not be true pid
