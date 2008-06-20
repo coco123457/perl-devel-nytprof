@@ -1005,7 +1005,7 @@ store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, double time,
 
 
 void
-write_sub_line_ranges(pTHX, int fids_only) {
+write_sub_line_ranges(pTHX_ int fids_only) {
 	char *sub_name;
 	I32 sub_name_len;
 	SV *file_lines_sv;
@@ -1452,7 +1452,7 @@ _assign_fids();
 	 * after a fork
 	 */
 	if (forkok)
-		write_sub_line_ranges(aTHX, 1);
+		write_sub_line_ranges(aTHX_ 1);
 
 void
 enable_profile(...)
@@ -1478,7 +1478,7 @@ _finish(...)
 	sv_setiv(PL_DBsingle, 0);
 	DB(aTHX); /* write data for final statement */
 	if (out && last_pid == getpid()) {
-		write_sub_line_ranges(aTHX, 0);
+		write_sub_line_ranges(aTHX_ 0);
 		write_sub_callers(aTHX);
 		/* mark end of profile data for this pid */
 		END_OUTPUT_PID();
