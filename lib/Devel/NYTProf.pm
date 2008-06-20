@@ -69,6 +69,7 @@ INIT {
 
 END {
 	# cleanup
+	#warn sprintf 'END Devel::NYTProf $$=%d\n', $$; # $$ may not be true pid
 	_finish();
 }
 
