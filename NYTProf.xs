@@ -77,7 +77,6 @@ static FILE* out;
 static FILE* in;
 static pid_t first_pid;
 static pid_t last_pid;
-static bool forkok = 0;
 static bool usecputime = 0;
 static bool profile_blocks = 0;
 
@@ -670,7 +669,7 @@ DB(pTHX) {
 	 * Also no new fids if we're not profiling - that's a workaround for
 	 * the DB() call in _finish() generating an extra fid for NYTProf.xs in perl 5.8.8
 	 */
-	last_executed_file = get_file_id(file, strlen(file), (last_pid == first_pid) ? SvIV(PL_DBsingle) : 0);
+	last_executed_file = get_file_id(file, strlen(file), SvIV(PL_DBsingle));
 	last_executed_line = CopLINE(cop);
 
   if (profile_blocks) {
@@ -707,10 +706,6 @@ set_option(const char* option) {
 		strncpy(PROF_output_file, &option[5], MAXPATHLEN);
 		if (trace_level) warn("# Using %s for output.\n", PROF_output_file);
 	}
-	else if(0 == strncmp(option, "allowfork", 9)) {
-		if (trace_level) warn("# Fork mode: ENABLED.\n");
-		forkok = 1;
-	}
 	else if(0 == strncmp(option, "usecputime", 10)) {
 		if (trace_level) warn("# Using cpu time.\n");
 		usecputime = 1;
@@ -744,7 +739,7 @@ open_output_file(pTHX_ char *filename) {
 	int fd = -2;
 
 	if (out && SvIV(PL_DBsingle)) {	/* already opened so assume forking */
-		sprintf(filename_buf, "%s.%d.%d", filename, getpid(), getppid());
+		sprintf(filename_buf, "%s.%d", filename, getpid());
 		filename = filename_buf;
 	}
 	else if (strEQ(filename, "STDOUT")) {
@@ -1032,7 +1027,7 @@ write_sub_line_ranges(pTHX_ int fids_only) {
 		if (!first_line && !last_line && strstr(sub_name, "::BEGIN"))
 			continue;	/* no point writing these */
 
-		fid = get_file_id(file_lines, first - file_lines, 0);
+		fid = get_file_id(file_lines, first - file_lines, (fids_only) ? 1 : 0);
 		if (!fid)  /* no point in writing subs in files we've not profiled */
 			continue;
 		if (fids_only)  /* caller just wants fids assigned */
@@ -1186,7 +1181,7 @@ load_profile_data_from_stream() {
 	while (EOF != (c = fgetc(in))) {
 		input_line++;
 		if (trace_level >= 4)
-			warn("Token %lu is %d ('%c')\n", input_line, c, c);
+			warn("Token %lu is %d ('%c') at %ld\n", input_line, c, c, ftell(in)-1);
 
 		switch (c) {
 			case '*':			/*FALLTHRU*/
@@ -1205,6 +1200,7 @@ load_profile_data_from_stream() {
 				filename_sv = *av_fetch(fid_filename_av, file_num, 1);
 				if (!SvOK(filename_sv)) {
 				  warn("File id %u used but not defined", file_num);
+					sv_setsv(filename_sv, &PL_sv_no); /* defined but false, as marker */
 				}
 				else if (SvROK(filename_sv)) {	/* is an eval */
 					AV *av = (AV*)SvRV(filename_sv);
@@ -1447,12 +1443,9 @@ init_profiler()
 void
 _assign_fids();
 	CODE:
-	/* if we may fork then assign fids to all (currently) known files
-	 * to limit the impact of the restriction on assigning fids
-	 * after a fork
-	 */
-	if (forkok)
-		write_sub_line_ranges(aTHX_ 1);
+	/* calls write_sub_line_ranges with fids_only flag true, so this just
+	 * assigns and outputs the fids for all loaded files */
+	write_sub_line_ranges(aTHX_ 1);
 
 void
 enable_profile(...)
@@ -1477,7 +1470,7 @@ _finish(...)
 		warn("_finish pid %d\n", getpid());
 	sv_setiv(PL_DBsingle, 0);
 	DB(aTHX); /* write data for final statement */
-	if (out && last_pid == getpid()) {
+	if (out) {
 		write_sub_line_ranges(aTHX_ 0);
 		write_sub_callers(aTHX);
 		/* mark end of profile data for this pid */
@@ -1487,12 +1480,6 @@ _finish(...)
 		out = NULL;
 	}
 
-void
-_finish_pid()
-	PPCODE:
-	if(last_pid == getpid()) {
-		END_OUTPUT_PID();
-	}
 
 MODULE = Devel::NYTProf		PACKAGE = Devel::NYTProf::Data
 PROTOTYPES: DISABLE 
@@ -1504,7 +1491,7 @@ load_profile_data_from_file(file=NULL)
 
 	set_options_from_env();
 	if (trace_level)
-               	warn("reading profile date from file %s\n", file);
+		warn("reading profile data from file %s\n", file);
 	if (strEQ(file,"STDIN")) {
 		int fd = dup(STDIN_FILENO);
 		if (-1 == fd)
