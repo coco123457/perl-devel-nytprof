@@ -8,27 +8,32 @@ use constant MP2 => (exists $ENV{MOD_PERL_API_VERSION} &&
                      $ENV{MOD_PERL_API_VERSION} == 2) ? 1 : 0;
 
 BEGIN {
-	if(!defined($ENV{NYTPROF})) {
-		warn "The environment variable NYTPROF is not available.  Is that what you really want to do?";
+	if ($ENV{NYTPROF}) {
+		warn "The environment variable NYTPROF is not available. You probably want to set it. See the Devel::NYTProf::Apache docs.\n";
 	}
 	require Devel::NYTProf;
+
+	# arrange for the profile to be enabled in each child
+	# and cleanly finished when the child exits
 	if (MP2) {
 		require mod_perl2;
 		require Apache2::ServerUtil;
 		my $s = Apache2::ServerUtil->server;
-                $s->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
-                $s->push_handlers(PerlChildExitHandler => \&DB::_finish);
-	} else {
+		$s->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
+		$s->push_handlers(PerlChildExitHandler => \&DB::_finish);
+	}
+	else {
 		require Apache;
-		Carp::carp("Apache.pm was not loaded\n")
-                        and return unless $INC{'Apache.pm'};
-                if(Apache->can('push_handlers')) {
-                        Apache->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
+		if(Apache->can('push_handlers')) {
+			Apache->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
 			Apache->push_handlers(PerlChildExitHandler => \&DB::_finish);
-        	}
+		}
+		else {
+		    Carp::carp("Apache.pm was not loaded");
+		}
 
 	}
-	DB::_finish_pid() if $ENV{NYTPROF} =~ /allowfork/;
+	DB::_finish_pid() if $ENV{NYTPROF} && $ENV{NYTPROF} =~ /allowfork/;
 }
 
 1;
