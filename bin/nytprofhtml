@@ -254,8 +254,8 @@ sub output_indexpage {
 	print OUT "<tr class='index'><th>File</th><th>Calls</th><th>Time</th>"
 						."<th>Avg Time/Call</th></tr>";
 
-	my $allTimes; # for stats table at the bottom only
-	my $allCalls; # for stats table at the bottom only
+	my $allTimes = 0; # for stats table at the bottom only
+	my $allCalls = 0; # for stats table at the bottom only
 
 	foreach (sort keys %$stats) {
 		my $safe = $stats->{$_}->{html_safe};
@@ -281,14 +281,14 @@ sub output_indexpage {
 			.'<tr><th>Field</th><th>Count</th><th>Median</th><th>Deviation</th></tr>'
 			.'<tr><td>Time</td><td>'.scalar(keys %$stats)."</td><td>$mean_t</td>"
 						."<td>$amdev_t</td></tr>"
-			.'<tr><td>Avg Time Per Call</td><td>'.scalar(keys %$stats)
+			.'<tr><td>Avg Time Per Statement</td><td>'.scalar(keys %$stats)
 						."</td><td>$mean_tc</td><td>$amdev_tc</td></tr>"
 			.'</table>';
 
 	
 
 	printf OUT '<table cellspacing=0 align=left>'
-							.'<tr><th>Total Execution Time</th><th>Total Lines Executed</th>'
+							.'<tr><th>Total Execution Time</th><th>Total Statements Executed</th>'
 							."</tr><tr><td>$allTimes</td><td>$allCalls</td></tr></table>";
 	print OUT "</body></html>";
 	close OUT;
