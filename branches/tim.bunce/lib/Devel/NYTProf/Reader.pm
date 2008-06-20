@@ -447,7 +447,9 @@ sub report {
 sub href_for_sub {
 	my ($self, $sub) = @_;
 	my ($file, $fid, $first, $last) = $self->{profile}->file_line_range_of_sub($sub) or do {
-		warn("No file line range data for sub '$sub'\n");
+		our %href_for_sub_no_data_warn;
+		warn("No file line range data for sub '$sub'\n")
+			unless $href_for_sub_no_data_warn{$sub}++; # warn just once
 		return "#sub unknown";
 	};
 	my $stats = $self->get_file_stats();
