@@ -459,7 +459,11 @@ sub href_for_sub {
 		#warn "[@{[ keys %$stats ]}]\n";
 		return "#sub unknown";
 	}
-	my $html_safe = $file_stats->{html_safe};
+	my $html_safe = $file_stats->{html_safe} ||= do {
+		# warn, just once, and use a default value
+		warn "Sub '$sub' file '$file' (fid $fid) has no html_safe value\n";
+		"unknown"
+	};
 	return "$html_safe.html#$first";
 }
 
