@@ -103,7 +103,7 @@ static bool firstrun = 1;
 static unsigned int ticks_per_sec = 0; /* 0 forces error if not set */
 
 /* prototypes */
-static void write_fids();
+static void write_cached_fids();
 void print_header(pTHX);
 unsigned int get_file_id(char*, STRLEN, int);
 void output_int(unsigned int);
@@ -125,8 +125,8 @@ HV *sub_callers_hv;
 	assert(out != NULL); fputc('P', out); output_int(getpid()); output_int(getppid()); \
 } STMT_END
 
-#define END_OUTPUT_PID() STMT_START { \
-	assert(out != NULL); fputc('p', out); output_int(getpid()); fflush(out); \
+#define END_OUTPUT_PID(pid) STMT_START { \
+	assert(out != NULL); fputc('p', out); output_int(pid); fflush(out); \
 } STMT_END
 
 
@@ -160,7 +160,7 @@ print_header(pTHX) {
 
 	OUTPUT_PID();
 
-	write_fids(); /* empty initially, non-empty after fork */
+	write_cached_fids(); /* empty initially, non-empty after fork */
 
 	fflush(out);
 }
@@ -270,7 +270,7 @@ emit_fid (Hash_entry *found) {
 
 
 static void
-write_fids() {
+write_cached_fids() {
 	Hash_entry *e = hashtable.first_inserted;
 	while (e) {
 		emit_fid(e);
@@ -1467,14 +1467,16 @@ void
 _finish(...)
 	PPCODE:
 	if (trace_level)
-		warn("_finish pid %d\n", getpid());
+		warn("_finish (last_pid %d, getpid %d)\n", last_pid, getpid());
 	sv_setiv(PL_DBsingle, 0);
 	DB(aTHX); /* write data for final statement */
 	if (out) {
 		write_sub_line_ranges(aTHX_ 0);
 		write_sub_callers(aTHX);
-		/* mark end of profile data for this pid */
-		END_OUTPUT_PID();
+		/* mark end of profile data for last_pid pid
+		 * (which is the pid that relates to the out filehandle)
+		 */
+		END_OUTPUT_PID(last_pid);
 		if (-1 == fclose(out))
 			warn("Error closing profile data file: %s", strerror(errno));
 		out = NULL;
