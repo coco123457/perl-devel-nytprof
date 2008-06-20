@@ -445,11 +445,14 @@ sub report {
 
 sub href_for_sub {
 	my ($self, $sub) = @_;
-	my ($file, $fid, $first, $last) = $self->{profile}->file_line_range_of_sub($sub);
+	my ($file, $fid, $first, $last) = $self->{profile}->file_line_range_of_sub($sub) or do {
+		warn("No file line range data for sub '$sub'\n");
+		return "#sub unknown";
+	};
 	my $stats = $self->get_file_stats();
 	my $file_stats = $stats->{$file};
 	if (!$file_stats) {
-		Carp::cluck("Sub '$sub' file '$file' not in stats");
+		warn("Sub '$sub' file '$file' (fid $fid) not in stats\n");
 		#warn "[@{[ keys %$stats ]}]\n";
 		return "#sub unknown";
 	}
