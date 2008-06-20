@@ -8,10 +8,12 @@ use constant MP2 => (exists $ENV{MOD_PERL_API_VERSION} &&
                      $ENV{MOD_PERL_API_VERSION} == 2) ? 1 : 0;
 
 BEGIN {
-	if ($ENV{NYTPROF}) {
-		warn "The environment variable NYTPROF is not available. You probably want to set it. See the Devel::NYTProf::Apache docs.\n";
+	if (!$ENV{NYTPROF}) {
+		$ENV{NYTPROF} = "file=/tmp/nytprof.$$.out";
+		warn "The environment variable NYTPROF is not available. Using NYTPROF=$ENV{NYTPROF} as the default";
 	}
 	require Devel::NYTProf;
+	#DB::disable_profile();
 
 	# arrange for the profile to be enabled in each child
 	# and cleanly finished when the child exits
@@ -24,7 +26,7 @@ BEGIN {
 	}
 	else {
 		require Apache;
-		if(Apache->can('push_handlers')) {
+		if (Apache->can('push_handlers')) {
 			Apache->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
 			Apache->push_handlers(PerlChildExitHandler => \&DB::_finish);
 		}
@@ -33,7 +35,6 @@ BEGIN {
 		}
 
 	}
-	DB::_finish_pid() if $ENV{NYTPROF} && $ENV{NYTPROF} =~ /allowfork/;
 }
 
 1;
@@ -67,16 +68,7 @@ Certain settings are important for C<mod_perl> users.
 =item file=N
 
 Tells C<Devel::NYTProf> where to save your profile data.  The module defaults
-to './nytprof.out' which is probably not what you want when starting Apache as 
-root.
-
-=item allowfork
-
-This setting is necessary when Apache is able to fork child processes to 
-handle requests.
-
-Repeating the warning from C<Devel::NYTProf>, I<WARNING: ignoring these
-settings may cause unintended side effects in code that might fork>
+to '/tmp/nytprof.$$.out' which may not be what you want.
 
 =back
 
@@ -91,7 +83,11 @@ Steve Peters, C<< <steve at fisharerojo.org> >>
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2008 by Adam Kaplan and The New York Times Company.
+Copyright (C) 2008 by Steve Peters.
+Copyright (C) 2008 by Tim Bunce.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,
 at your option, any later version of Perl 5 you may have available.
+
+=cut
