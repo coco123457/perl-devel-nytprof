@@ -217,6 +217,7 @@ sub calculate_standard_deviation {
 ## Use average distance from the median value. Highly resistant to extremes
 sub calculate_median_absolute_deviation {
 	my $stats = shift;
+	return [ 0, 0 ] if @$stats == 0; # no data
 	$stats = [sort {$a <=> $b} @$stats];
 	my $median = $stats->[int (scalar(@$stats) / 2)];
 	my $sum;
