@@ -18,8 +18,15 @@ BEGIN {
 	# setting $^P non-zero automatically initializes perl debugging internals
 	# (mg.c calls init_debugger) if $DB::single is false. This is handy for
 	# situations like mod_perl where perl wasn't started with -d flag.
-	$^P=0x1;    # on
-	$^P=0x0;    # then back off again for now, see below
+	# set the flags that influence compilation ASAP so we get full details
+	# (sub line ranges etc) of modules loaded as a side effect of loading
+	# Devel::NYTProf::Core (ie XSLoader, strict, Exporter etc.)
+	$^P = 0x002 # line-by-line profiling (if $DB::single true)
+			| 0x010 # record line range of sub definition
+	    | 0x020 # start (after BEGINs) with single-step on
+	    | 0x100 # informative "file" names for evals
+	    | 0x200;# informative names for anonymous subroutines
+	# extra $^P flags are enabled below
 
 	require Devel::NYTProf::Core; # loads XS
 
@@ -31,14 +38,9 @@ BEGIN {
 
 	init_profiler();
 
-	# enable debugging - see perlvar docs
-	$^P=  0x002 # Line-by-line debugging (call DB::DB() per statement)
-	    | 0x010 # record line range of sub definition
-	    | 0x020 # start (after BEGINs) with single-step on
-	    | 0x100 # informative "file" names for evals
-	    | 0x200;# informative names for anonymous subroutines
+	#$DB::single = 1; # enable profiling of remaining compile-time execution
 	# put nothing here
-    }
+}
 
 =for comment from perlvar
 
