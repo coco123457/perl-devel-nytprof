@@ -161,9 +161,6 @@ Write up change notes
 
 Write, clean-up documentation
 
-Add <a name=$line_number> to html output to enable linking to lines
-(needed for 'sub caller' linking)
-
 Ability to run bin/nytprof* in perl -d (debugger mode)
 
 (tim.bunce)
@@ -202,3 +199,7 @@ so that the .rdt tests aren't affected by variations between versions of library
 Support profiling programs which use threads:
 	- move all relevant globals into a structure
 	- add lock around output to file
+
+For testing we need normalize_variables() to remove profile data for library
+modules (like AutoLoader), otherwise we'll get failures due to line number
+differences for users with a different version of those modules installed.
