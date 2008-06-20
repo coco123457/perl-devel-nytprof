@@ -36,6 +36,8 @@ use Cwd qw(getcwd);
 use Devel::NYTProf::Core;
 use Devel::NYTProf::Util qw(strip_prefix_from_paths);
 
+my $trace = 0;
+
 =head2 new
 
 	$profile = Devel::NYTProf::Data->new( { filename => 'nytprof.out' } );
@@ -57,9 +59,9 @@ sub new {
 	} else {
 		push @files, $args->{filename};
 	}
-        my $profile;
+	my $profile;
 
-        for my $file (@files) {
+	for my $file (@files) {
 		$profile = Devel::NYTProf::Data::load_profile_data_from_file($file);
 	}
 	bless $profile => $class;
@@ -73,7 +75,7 @@ sub new {
   $profile->dump_profile_data;
   $profile->dump_profile_data( {
     filehandle => \*STDOUT,
-		separator  => "",
+    separator  => "",
   } );
 
 Writes the profile data in a reasonably human friendly format to the sepcified
@@ -128,22 +130,22 @@ If C<separator> is true then instead of whitespace, each item of data is
 indented with the I<path> through the structure with C<separator> used to
 separarate the elements of the path.
 
-	attribute	basetime	1207228260
-	attribute	ticks_per_sec	1000000
-	attribute	xs_version	1.13
-	fid_filename	1	test01.p
-	fid_line_time	1	2	[ 4e-06 2 ]
-	fid_line_time	1	3	[ 1.1e-05 2 ]
-	fid_line_time	1	7	[ 4.4e-05 4 ]
-	fid_line_time	1	11	[ 2e-06 1 ]
-	fid_line_time	1	16	[ 1e-05 1 ]
-	sub_caller	main::bar	1	12	1
-	sub_caller	main::bar	1	16	1
-	sub_caller	main::bar	1	3	2
-	sub_caller	main::foo	1	11	1
-	sub_fid_line	main::bar	[ 1 6 8 ]
-	sub_fid_line	main::foo	[ 1 1 4 ]
-
+  attribute	basetime	1207228260
+  attribute	ticks_per_sec	1000000
+  attribute	xs_version	1.13
+  fid_filename	1	test01.p
+  fid_line_time	1	2	[ 4e-06 2 ]
+  fid_line_time	1	3	[ 1.1e-05 2 ]
+  fid_line_time	1	7	[ 4.4e-05 4 ]
+  fid_line_time	1	11	[ 2e-06 1 ]
+  fid_line_time	1	16	[ 1e-05 1 ]
+  sub_caller	main::bar	1	12	1
+  sub_caller	main::bar	1	16	1
+  sub_caller	main::bar	1	3	2
+  sub_caller	main::foo	1	11	1
+  sub_fid_line	main::bar	[ 1 6 8 ]
+  sub_fid_line	main::foo	[ 1 1 4 ]
+  
 This format is especially useful for grep'ing and diff'ing.
 
 =cut
@@ -230,8 +232,8 @@ The data normalized is:
 sub normalize_variables {
 	my $self = shift;
 
-  $self->{attribute}{basetime} = 0;
-  $self->{attribute}{xs_version} = 0;
+	$self->{attribute}{basetime} = 0;
+	$self->{attribute}{xs_version} = 0;
 
 	for (keys %$self) {
 		# fid_line_times => [fid][line][time,...]
@@ -393,7 +395,7 @@ sub fid_filename {
 		# eg string eval
 		# eg [ "(eval 6)[/usr/local/perl58-i/lib/5.8.6/Benchmark.pm:634]", 2, 634 ]
 		warn sprintf "fid_filename: fid %d -> %d for %s\n",
-			$fid, $file->[1], $file->[0];
+			$fid, $file->[1], $file->[0] if $trace;
 		# follow next link in chain
 		my $outer_fid = $file->[1];
 		$file = $self->{fid_filename}->[$outer_fid];
@@ -434,7 +436,7 @@ sub file_line_range_of_sub {
 		# eg string eval
 		# eg [ "(eval 6)[/usr/local/perl58-i/lib/5.8.6/Benchmark.pm:634]", 2, 634 ]
 		warn sprintf "%s: fid %d -> %d for %s\n",
-			$sub, $fid, $file->[1], $file->[0];
+			$sub, $fid, $file->[1], $file->[0] if $trace;
 		$first = $last = $file->[2] if 1; # XXX control via param?
 		# follow next link in chain
 		my $outer_fid = $file->[1];
