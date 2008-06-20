@@ -229,7 +229,7 @@ sub _test_file {
 	my $self = shift;
 	my $file = shift;
 	unless (-f $file) {
-		carp "Unable to locate source file '$file'\n";
+		carp "Unable to locate source file '$file'";
 		return 0; 
 	}
 	return 1 if (stat $file)[9] > $self->{profile}{attribute}{basetime};
