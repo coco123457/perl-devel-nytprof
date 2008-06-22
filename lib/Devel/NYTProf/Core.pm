@@ -8,6 +8,13 @@ our $VERSION = '1.50'; # increment with XS changes too
 
 XSLoader::load('Devel::NYTProf', $VERSION);
 
+if (my $NYTPROF = $ENV{NYTPROF}) {
+	for my $optval (split /:/, $NYTPROF) {
+		my ($opt, $val) = split /=/, $optval, 2;
+		DB::set_option( $opt, $val );
+	}
+}
+
 1;
 
 __END__
