@@ -33,7 +33,7 @@ sub_caller	AutoLoader::AUTOLOAD	1	8	1
 sub_caller	AutoLoader::AUTOLOAD	1	9	1
 sub_fid_line	AutoLoader::AUTOLOAD	[ 2 21 117 ]
 sub_fid_line	AutoLoader::BEGIN	[ 2 173 173 ]
-sub_fid_line	AutoLoader::__ANON__[/usr/local/lib/perl5/5.8.6/AutoLoader.pm:96]	[ 2 96 96 ]
+sub_fid_line	AutoLoader::__ANON__[AutoLoader.pm:96]	[ 2 96 96 ]
 sub_fid_line	AutoLoader::import	[ 2 119 168 ]
 sub_fid_line	AutoLoader::unimport	[ 2 170 177 ]
 sub_fid_line	main::BEGIN	[ 1 7 7 ]

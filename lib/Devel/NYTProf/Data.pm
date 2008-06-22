@@ -245,7 +245,14 @@ sub normalize_variables {
 		}
 	}
 
-	$self->make_fid_filenames_relative( [ @INC, '.' ] );
+	my $inc = [ @INC, '.' ];
+
+	$self->make_fid_filenames_relative( $inc );
+
+	# normalize sub names like
+	#		AutoLoader::__ANON__[/lib/perl5/5.8.6/AutoLoader.pm:96]
+	strip_prefix_from_paths($inc, $self->{sub_caller},   '\[');
+	strip_prefix_from_paths($inc, $self->{sub_fid_line}, '\[');
 
 	return;
 }
@@ -254,7 +261,7 @@ sub normalize_variables {
 sub make_fid_filenames_relative {
 	my ($self, $roots) = @_;
 	$roots ||= [ '.' ]; # e.g. [ @INC, '.' ]
-	strip_prefix_from_paths($roots, $self->{fid_filename});
+	strip_prefix_from_paths($roots, $self->{fid_filename}, undef);
 }
 
 

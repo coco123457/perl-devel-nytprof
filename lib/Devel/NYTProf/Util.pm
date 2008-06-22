@@ -34,9 +34,12 @@ our @EXPORT_OK = qw(
 # edit @$paths in-place to remove specified absolute path prefixes
 
 sub strip_prefix_from_paths {
-	my ($inc_ref, $paths) = @_;
+	my ($inc_ref, $paths, $anchor) = @_;
+	$anchor = '^' if not defined $anchor;
 
-	my @inc = @$inc_ref or return;
+	my @inc = @$inc_ref
+		or return;
+	return if not defined $paths;
 
 	# rewrite relative directories to be absolute
   # the logic here should match that in get_file_id()
@@ -48,14 +51,32 @@ sub strip_prefix_from_paths {
     $_ = ($_ eq '.') ? $cwd : "$cwd/$_";
   }
 
+	# sort longest paths first
+	@inc = sort { length $b <=> length $a } @inc;
+
 	# build string regex for each path
 	my $inc_regex = join "|", map { quotemeta $_ } @inc;
 
 	# convert to regex object, anchor at start, soak up any /'s at end
-	$inc_regex = qr{^(?:$inc_regex)/*};
+	$inc_regex = qr{($anchor)(?:$inc_regex)/*};
 
 	# strip off prefix using regex, skip any empty/undef paths
-	$_ and s{$inc_regex}{} for @$paths;
+	if (ref $paths eq 'ARRAY') {
+		$_ and s{$inc_regex}{} for @$paths;
+	}
+	elsif (ref $paths eq 'HASH') {
+		for my $orig (keys %$paths) {
+			(my $new = $orig) =~ s{$inc_regex}{$1}
+				or next;
+			my $value = delete $paths->{$orig};
+			warn "Stripping prefix from $orig overwrites existing $new"
+				if defined $paths->{$new};
+			$paths->{$new} = $value;
+		}
+	}
+	else {
+		croak "Can't strip_prefix_from_paths of $paths";
+	}
 
 	return;
 }
