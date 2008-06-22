@@ -199,7 +199,3 @@ so that the .rdt tests aren't affected by variations between versions of library
 Support profiling programs which use threads:
 	- move all relevant globals into a structure
 	- add lock around output to file
-
-For testing we need normalize_variables() to remove profile data for library
-modules (like AutoLoader), otherwise we'll get failures due to line number
-differences for users with a different version of those modules installed.
