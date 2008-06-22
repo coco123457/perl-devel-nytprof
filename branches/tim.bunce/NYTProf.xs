@@ -108,10 +108,9 @@ void print_header(pTHX);
 unsigned int get_file_id(char*, STRLEN, int);
 void output_int(unsigned int);
 void DB(pTHX);
-void set_option(const char*);
+void set_option(const char*, const char*);
 void open_output_file(pTHX_ char *);
 void reinit_if_forked(pTHX);
-void set_options_from_env();
 HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
 															double time, int count, unsigned int fid);
@@ -701,30 +700,29 @@ DB(pTHX) {
  * Sets or toggles the option specified by 'option'. 
  */
 void
-set_option(const char* option) {
-	if(0 == strncmp(option, "file=", 5)) {
-		strncpy(PROF_output_file, &option[5], MAXPATHLEN);
-		if (trace_level) warn("# Using %s for output.\n", PROF_output_file);
+set_option(const char* option, const char* value) {
+
+	if (strEQ(option, "file")) {
+		strncpy(PROF_output_file, value, MAXPATHLEN);
 	}
-	else if(0 == strncmp(option, "usecputime", 10)) {
-		if (trace_level) warn("# Using cpu time.\n");
+	else if (strEQ(option, "usecputime")) {
 		usecputime = 1;
 	}
-	else if(0 == strncmp(option, "blocks", 6)) {
-		if (trace_level) warn("# profiling blocks.\n");
+	else if (strEQ(option, "blocks")) {
 		profile_blocks = 1;
 	}
-	else if(0 == strncmp(option, "expand", 6)) {
-		if (trace_level) warn("# expand\n");
+	else if (strEQ(option, "expand")) {
 		embed_fid_line = 1;
 	}
-	else if(0 == strncmp(option, "trace=", 6)) {
-		trace_level = atoi(option+6);
-		if (trace_level) warn("# trace set to %d.\n", trace_level);
+	else if (strEQ(option, "trace")) {
+		trace_level = atoi(value);
 	}
 	else {
 		warn("Unknown option: %s\n", option);
+		return;
 	}
+	if (trace_level)
+		warn("# %s=%s\n", option, value);
 }
 
 /**
@@ -862,33 +860,6 @@ pp_entersub_profiler(pTHX) {
  * Shared Reader,NYTProf Functions  *
  ************************************/
 
-/**
- * Populate runtime values from environment, the running script or use defaults
- */
-void
-set_options_from_env() {
-
-	/* Runtime configuration
-	   Environment vars have lower priority */
-	char* sysenv = getenv("NYTPROF");
-	if (NULL != sysenv && strlen(sysenv) > 0) {
-		char env[500];
-		char* result = NULL;
-
-		my_strlcpy(env, sysenv, sizeof(env));
-		result = strtok(env, ":");
-
-		if (NULL == result) {
-			set_option(env);
-		}
-		while(result != NULL) {
-			set_option(result);
-			result = strtok(NULL, ":");
-		}
-	}
-
-}
-
 /* Initial setup */
 void
 init_profiler(pTHX) {
@@ -912,8 +883,6 @@ init_profiler(pTHX) {
 	hashtable.table = (Hash_entry**)safemalloc(hashtable_memwidth);
 	memset(hashtable.table, 0, hashtable_memwidth);
 	
-	set_options_from_env();
-
 	open_output_file(aTHX_ PROF_output_file);
 
 	intercept_opcodes(aTHX);
@@ -1436,6 +1405,9 @@ DB(...)
 		DB(aTHX);
 
 void
+set_option(const char *opt, const char *value)
+
+void
 init_profiler()
 	CODE:
 		init_profiler(aTHX);
@@ -1484,7 +1456,6 @@ load_profile_data_from_file(file=NULL)
 	char *file;
 	CODE:
 
-	set_options_from_env();
 	if (trace_level)
 		warn("reading profile data from file %s\n", file);
 	if (strEQ(file,"STDIN")) {
