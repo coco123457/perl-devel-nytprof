@@ -145,7 +145,6 @@ sub profile {
 	
 	my @NYTPROF;
 	push @NYTPROF, $ENV{NYTPROF_TEST} if $ENV{NYTPROF_TEST};
-	push @NYTPROF, "allowfork" if $test eq "test04.p";
 	push @NYTPROF, "file=$profile_datafile";
 	local $ENV{NYTPROF} = join ":", @NYTPROF;
 	print "NYTPROF=$ENV{NYTPROF}\n" if $opts{v} && $ENV{NYTPROF};
