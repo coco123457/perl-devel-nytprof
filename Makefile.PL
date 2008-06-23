@@ -156,7 +156,7 @@ WriteMakefile(
     												# e.g., '-I. -I/usr/include/other'
     INC               => $include_string, # e.g., '-I. -I/usr/include/other'
 		clean							=> { 
-			FILES	=> "nytprof.out profiler t/nytprof.out t/profiler t/test*.rdt.new t/auto"
+			FILES	=> "nytprof.out profiler t/nytprof.out t/profiler t/test*.*.new t/auto"
 		},
 		%mm_opts,
 );

@@ -225,6 +225,7 @@ The data normalized is:
  - profile timing data: set to 0
  - basetime attribute: set to 0
  - xs_version attribute: set to 0
+ - perl_version attribute: set to 0
  - filenames: path prefixes matching absolute paths in @INC are removed
 
 =cut
@@ -234,6 +235,7 @@ sub normalize_variables {
 
 	$self->{attribute}{basetime} = 0;
 	$self->{attribute}{xs_version} = 0;
+	$self->{attribute}{perl_version} = 0;
 
 	for (keys %$self) {
 		# fid_line_times => [fid][line][time,...]

@@ -175,8 +175,6 @@ See http://search.cpan.org/dist/Devel-Profile/ for use case.
 Add @INC to data file so reports can be made more readable by removing
 (possibly very long) library paths where appropriate.
 
-Add perl version $] to data file.
-
 Add size and mtime of fid to data file.
 
 Intercept all opcodes that may fork and run perl code in the child
@@ -185,8 +183,7 @@ Intercept all opcodes that may fork and run perl code in the child
   and reinit_if_forked() afterwards
 	add option to force reinit_if_forked check per stmt just-in-case
 
-Add seperate utility to merge profile files and write out a new one
-	containing the merged data
+Add way to merge profile data. Merging could be done in perl.
 
 Add constants to Data.pm for the array indexes
 0=time_spent
@@ -199,3 +196,14 @@ so that the .rdt tests aren't affected by variations between versions of library
 Support profiling programs which use threads:
 	- move all relevant globals into a structure
 	- add lock around output to file
+
+Add functions to read & write strings to the profile data file that uses an
+integer length prefix.  Replace all current newline-terminated strings with the
+new code, so we're safe from embedded newlines and can also store multi-line strings.
+
+Support optionally generating a compressed data file (using popen("zip -c > $file"))
+
+Support optionally saving eval strings (from @{"_<$filename"}, see perldoc perldebguts)
+Should always save the first eval string at each distinct eval (fid:line)
+and require an option to save them all (which could make the data file very large).
+

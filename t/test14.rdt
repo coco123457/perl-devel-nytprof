@@ -1,4 +1,5 @@
 attribute	basetime	0
+attribute	perl_version	0
 attribute	ticks_per_sec	1000000
 attribute	xs_version	0
 fid_filename	1	test14.p
