@@ -1,39 +1,43 @@
 package Devel::NYTProf::Apache;
 
-use strict;
-
 our $VERSION = 0.01;
+
+BEGIN {
+
+    # Load Devel::NYTProf before loading any other modules
+    # in order that $^P settings apply to the compilation
+    # of those modules.
+
+    if (!$ENV{NYTPROF}) {
+	    $ENV{NYTPROF} = "trace=1:file=/tmp/nytprof.$$.out";
+	    warn "Defaulting NYTPROF env var to '$ENV{NYTPROF}'";
+    }
+
+    require Devel::NYTProf;
+}
+
+use strict;
 
 use constant MP2 => (exists $ENV{MOD_PERL_API_VERSION} &&
                      $ENV{MOD_PERL_API_VERSION} == 2) ? 1 : 0;
 
-BEGIN {
-	if (!$ENV{NYTPROF}) {
-		$ENV{NYTPROF} = "file=/tmp/nytprof.$$.out";
-		warn "The environment variable NYTPROF is not available. Using NYTPROF=$ENV{NYTPROF} as the default";
-	}
-	require Devel::NYTProf;
-	#DB::disable_profile();
-
-	# arrange for the profile to be enabled in each child
-	# and cleanly finished when the child exits
-	if (MP2) {
-		require mod_perl2;
-		require Apache2::ServerUtil;
-		my $s = Apache2::ServerUtil->server;
-		$s->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
-		$s->push_handlers(PerlChildExitHandler => \&DB::_finish);
+# arrange for the profile to be enabled in each child
+# and cleanly finished when the child exits
+if (MP2) {
+	require mod_perl2;
+	require Apache2::ServerUtil;
+	my $s = Apache2::ServerUtil->server;
+	$s->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
+	$s->push_handlers(PerlChildExitHandler => \&DB::_finish);
+}
+else {
+	require Apache;
+	if (Apache->can('push_handlers')) {
+		Apache->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
+		Apache->push_handlers(PerlChildExitHandler => \&DB::_finish);
 	}
 	else {
-		require Apache;
-		if (Apache->can('push_handlers')) {
-			Apache->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
-			Apache->push_handlers(PerlChildExitHandler => \&DB::_finish);
-		}
-		else {
-		    Carp::carp("Apache.pm was not loaded");
-		}
-
+	    Carp::carp("Apache.pm was not loaded");
 	}
 }
 
