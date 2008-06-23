@@ -326,20 +326,25 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 		}
 
 		/* determine absolute path if file_name is relative */
+		found->key_abs = NULL;
 		if (!found->eval_fid && *file_name != '/') {
 			char file_name_abs[MAXPATHLEN * 2];
-			/* note that we don't use realpath() or similar here */
-			/* because we want to keep the programs view of symlinks etc */
-			char *ptr = getcwd(file_name_abs, sizeof(file_name_abs));
-			PERL_UNUSED_VAR(ptr);
-			if (strnEQ(file_name, "./", 2))
-			     ++file_name;
-			else strcat(file_name_abs, "/");
-			strncat(file_name_abs, file_name, file_name_len);
-			found->key_abs = strdup(file_name_abs);
-		}
-		else {
-			found->key_abs = NULL;
+			/* Note that the current directory may have changed
+			 * between loading the file and profiling it.
+			 * We don't use realpath() or similar here because we want to
+			 * keep the of symlinks etc. as the program saw them.
+			 */
+			if (!getcwd(file_name_abs, sizeof(file_name_abs))) {
+				warn("getcwd: %s\n", strerror(errno)); /* eg permission */
+			}
+			else if (strNE(file_name_abs, "/")) {
+				if (strnEQ(file_name, "./", 2))
+					++file_name;
+				else
+					strcat(file_name_abs, "/");
+				strncat(file_name_abs, file_name, file_name_len);
+				found->key_abs = strdup(file_name_abs);
+			}
 		}
 
 		emit_fid(found);
@@ -349,8 +354,8 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 				warn("New fid %2u: %.*s (eval fid %u line %u)\n",
 					found->id, found->key_len, found->key, found->eval_fid, found->eval_line_num);
 		  else
-				warn("New fid %2u: %.*s\n",
-					found->id, found->key_len, found->key);
+				warn("New fid %2u: %.*s %s\n",
+					found->id, found->key_len, found->key, (found->key_abs) ? found->key_abs : "");
 		}
 	}
   else if (trace_level >= 4) {
