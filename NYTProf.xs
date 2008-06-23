@@ -110,7 +110,7 @@ void output_int(unsigned int);
 void DB(pTHX);
 void set_option(const char*, const char*);
 void open_output_file(pTHX_ char *);
-void reinit_if_forked(pTHX);
+int reinit_if_forked(pTHX);
 HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
 															double time, int count, unsigned int fid);
@@ -350,12 +350,16 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 		emit_fid(found);
 
 		if (trace_level) {
+			/* including last_executed_file can be handy for tracking down how
+			 * a file got loaded */
 			if (found->eval_fid)
-				warn("New fid %2u: %.*s (eval fid %u line %u)\n",
-					found->id, found->key_len, found->key, found->eval_fid, found->eval_line_num);
+				warn("New fid %2u (after %2u:%-4u): %.*s (eval fid %u line %u)\n",
+					found->id, last_executed_file, last_executed_line,
+					found->key_len, found->key, found->eval_fid, found->eval_line_num);
 		  else
-				warn("New fid %2u: %.*s %s\n",
-					found->id, found->key_len, found->key, (found->key_abs) ? found->key_abs : "");
+				warn("New fid %2u (after %2u:%-4u): %.*s %s\n",
+					found->id, last_executed_file, last_executed_line,
+					found->key_len, found->key, (found->key_abs) ? found->key_abs : "");
 		}
 	}
   else if (trace_level >= 4) {
@@ -649,7 +653,7 @@ DB(pTHX) {
 	if (!out)
 		return;
 
-	if (!firstrun) { 
+	if (!firstrun) {
 		reinit_if_forked(aTHX);
 
 		fputc( (profile_blocks) ? '*' : '+', out);
@@ -664,17 +668,19 @@ DB(pTHX) {
 			warn("Wrote %d:%-4d %2u ticks (%u, %u)\n", last_executed_file, 
 						last_executed_line, elapsed, last_block_line, last_sub_line);
 
-	} else {
+	}
+	else {
 		firstrun = 0;
+		if (trace_level >= 1) {
+			warn("NYTProf pid %d %d: %s line %d of %s",
+				getpid(), SvIV(PL_DBsingle),
+				(firstrun) ? "skipped false start" : "first statement",
+				CopLINE(cop), OutCopFILE(cop));
+		}
 	}
 
 	file = OutCopFILE(cop);
-	/* XXX temporary restriction until we get better support for forking,
-	 * if we've forked then we no longer allow new fids to be generated.
-	 * Also no new fids if we're not profiling - that's a workaround for
-	 * the DB() call in _finish() generating an extra fid for NYTProf.xs in perl 5.8.8
-	 */
-	last_executed_file = get_file_id(file, strlen(file), SvIV(PL_DBsingle));
+	last_executed_file = get_file_id(file, strlen(file), 1);
 	last_executed_line = CopLINE(cop);
 
   if (profile_blocks) {
@@ -776,10 +782,10 @@ open_output_file(pTHX_ char *filename) {
 }
 
 
-void
+int
 reinit_if_forked(pTHX) {
 	if (getpid() == last_pid)
-		return;
+		return 0;		/* not forked */
 	if (trace_level >= 1)
 		warn("New pid %d (was %d)\n", getpid(), last_pid);
 	last_pid = getpid();
@@ -789,6 +795,7 @@ reinit_if_forked(pTHX) {
 	* until the program exits and that'll be much easier to handle by the reader
 	*/
 	open_output_file(aTHX_ PROF_output_file);
+	return 1;		/* have forked */
 }
 
 
