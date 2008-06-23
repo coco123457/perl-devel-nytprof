@@ -153,9 +153,10 @@ print_header(pTHX) {
 
 	/* XXX add options, $0, etc, but beware of embedded newlines */
 	/* XXX would be good to adopt a proper charset & escaping for these */
-	fprintf(out, ":%s=%lu\n", "basetime", (unsigned long)PL_basetime); /* $^T */
-	fprintf(out, ":%s=%s\n", "xs_version", XS_VERSION);
-	fprintf(out, ":%s=%u\n", "ticks_per_sec", ticks);
+	fprintf(out, ":%s=%lu\n",      "basetime",      (unsigned long)PL_basetime); /* $^T */
+	fprintf(out, ":%s=%s\n",       "xs_version",    XS_VERSION);
+	fprintf(out, ":%s=%d.%d.%d\n", "perl_version",  PERL_REVISION, PERL_VERSION, PERL_SUBVERSION);
+	fprintf(out, ":%s=%u\n",       "ticks_per_sec", ticks);
 
 	OUTPUT_PID();
 
