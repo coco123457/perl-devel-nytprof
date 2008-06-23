@@ -209,28 +209,21 @@ sub output_indexpage {
   # resolution
 	my $stats = $r->get_file_stats();
 
-	my @values;
-	map(push (@values, $_->{'time'}), values %$stats);
-
+	my @values = map { $_->{'time'} } values %$stats;
 	# Use Median Absolute Deviation Formula
 	my ($amdev_t, $mean_t) = 
 			@{Devel::NYTProf::Reader::calculate_median_absolute_deviation(\@values)};
-  # Use Standard Deviation Formula
-	#my ($amdev_t, $mean_t) = Devel::NYTProf::Reader::calculate_sd(\@values);
 	undef @values;
 
-	map ($stats->{$_}->{'time/call'} = 
-				($stats->{$_}->{calls} > 0 ? 
-				    $stats->{$_}->{'time'} / $stats->{$_}->{calls} : 0), keys %$stats);
+	for (values %$stats) {
+		next if not $_;
+		$_->{'time/call'} = ($_->{calls}) ?  $_->{'time'} / $_->{calls} : 0;
+	}
 
-	map(push (@values, $_->{'time/call'}), values %$stats);
-
+	@values = map { $_->{'time/call'} } values %$stats;
 	# Use Median Absolute Deviation Formula
 	my ($amdev_tc, $mean_tc) = 
 			@{Devel::NYTProf::Reader::calculate_median_absolute_deviation(\@values)};
-  # Use Standard Deviation Formula
-	#my ($amdev_tc, $mean_tc) = 
-	#		Devel::NYTProf::Reader::calculate_standard_deviation(\@values);
 	undef @values;
 
 	###
@@ -245,7 +238,8 @@ sub output_indexpage {
 	# generate select options for namespace groupings
 	foreach (sort keys %$stats) {
 		my $safe = $stats->{$_}->{html_safe};
-		print OUT "<option onClick=location.href=('#$safe');>$_</option>\n";
+		print OUT "<option onClick=location.href=('#$safe');>$_</option>\n"
+				if $safe;
 	}
 	print OUT "</select><br/><br/>\n";
 
