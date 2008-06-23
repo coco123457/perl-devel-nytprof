@@ -97,7 +97,6 @@ static unsigned int last_executed_line;
 static unsigned int last_executed_file;
 static unsigned int last_block_line;
 static unsigned int last_sub_line;
-static bool firstrun = 1;
 
 /* reader module variables */
 static unsigned int ticks_per_sec = 0; /* 0 forces error if not set */
@@ -653,7 +652,7 @@ DB(pTHX) {
 	if (!out)
 		return;
 
-	if (!firstrun) {
+	if (last_executed_file) {
 		reinit_if_forked(aTHX);
 
 		fputc( (profile_blocks) ? '*' : '+', out);
@@ -670,12 +669,9 @@ DB(pTHX) {
 
 	}
 	else {
-		firstrun = 0;
 		if (trace_level >= 1) {
-			warn("NYTProf pid %d %d: %s line %d of %s",
-				getpid(), SvIV(PL_DBsingle),
-				(firstrun) ? "skipped false start" : "first statement",
-				CopLINE(cop), OutCopFILE(cop));
+			warn("NYTProf pid %d: first statement line %d of %s",
+				getpid(), CopLINE(cop), OutCopFILE(cop));
 		}
 	}
 
