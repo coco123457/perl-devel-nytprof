@@ -169,6 +169,10 @@ but the cost of copying the result goes to the method (poor).
 Overriding pp_leavesub may allow more accurate measurements by avoiding return
 value processing overheads accumulating on last statement in sub.
 
+Similarly, the cost of retesting the loop condition is accounted
+for by the last statement executed each time round the loop.
+Overriding relevant ops may enable better accounting.
+
 Add way for program being profiled to switch output to a new profile file.
 See http://search.cpan.org/dist/Devel-Profile/ for use case.
 
@@ -207,3 +211,5 @@ Support optionally saving eval strings (from @{"_<$filename"}, see perldoc perld
 Should always save the first eval string at each distinct eval (fid:line)
 and require an option to save them all (which could make the data file very large).
 
+Add % of total time to index page
+Remove bottom stats.
