@@ -15,7 +15,6 @@ use strict;
 
 use Carp;
 use ExtUtils::testlib;
-use Benchmark;
 use Getopt::Long;
 use Config;
 use Test::More;
@@ -149,9 +148,7 @@ sub profile {
 	local $ENV{NYTPROF} = join ":", @NYTPROF;
 	print "NYTPROF=$ENV{NYTPROF}\n" if $opts{v} && $ENV{NYTPROF};
 
-	my $t_start = new Benchmark;
 	my @results = run_command("$perl -d:NYTProf $test");
-	my $t_total = timediff( new Benchmark, $t_start );
 	pass($test); # mainly to show progress
 	#print timestr( $t_total, 'nop' ), "\n";
 }
