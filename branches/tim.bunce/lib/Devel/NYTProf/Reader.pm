@@ -281,6 +281,8 @@ sub report {
 		$fname =~ s#[/\\]#-#go; # replace / and \ with html safe -
 
 		$self->{filestats}->{$filestr}->{html_safe} = $fname;
+		# store original filename in value as well as key
+		$self->{filestats}->{$filestr}->{filename} = $filestr;
 	}
 
 	foreach my $filestr (keys %{$self->{data}}) {
