@@ -28,6 +28,7 @@ print "Looking for stdio.h and stdio_ext.h\n";
 my $INCLUDE;
 my $stdio_dir;
 my $stdio_ext_dir;
+my $time_dir;
 
 sub search_paths {
 	my $dir = shift;
@@ -40,12 +41,15 @@ sub search_paths {
 				$stdio_dir = $_ unless defined $stdio_dir;
 			} elsif ($file =~ m/^stdio_ext\.h$/) {
 				$stdio_ext_dir = $_ unless defined $stdio_ext_dir;
+			} elsif ($file =~ m/^time\.h$/) {
+				$time_dir = $_ unless defined $time_dir;
 			}
-			last if (defined $stdio_dir && defined $stdio_ext_dir);
+			last if (defined $stdio_dir && defined $stdio_ext_dir
+				&& defined $time_dir);
 		}
 
 		closedir(DIR);
-		last if (defined $stdio_dir && defined $stdio_ext_dir);
+		last if (defined $stdio_dir && defined $stdio_ext_dir && defined $time_dir);
 	}
 }
 
@@ -56,7 +60,7 @@ if (!defined $cpp || 0 == length($cpp)) {
 }
 
 my $fpurge;
-sub search_files {
+sub search_for_fpurge {
 	if (defined $stdio_dir) {
 		open(STDIOH, "$cpp $stdio_dir/stdio.h |");
 		while (<STDIOH>) {
@@ -84,8 +88,21 @@ sub search_files {
 	}
 }
 
-# verify
-sub verify {
+my $clock_gettime;
+sub search_for_clock_gettime {
+	if (defined $time_dir) {
+		open(TIMEH, "$cpp $time_dir/time.h |");
+                while (<TIMEH>) {
+			if (m/(clock_gettime)\s*\(/go) {
+				$clock_gettime = $1;
+                                last;
+                        }
+                }
+                close TIMEH;
+        } 
+}
+
+sub verify_fpurge {
 	if (defined ($fpurge)) {
 		if (defined $stdio_ext_dir) {
 			print "Found $fpurge in $stdio_ext_dir/stdio_ext.h\n";
@@ -104,9 +121,10 @@ if (defined $ENV{INCLUDE}) {
 } else {
   search_paths('/include:/usr/include:/usr/local/include');
 }
-search_files();
+search_for_fpurge();
+search_for_clock_gettime();
 
-while(!verify) {
+while(!verify_fpurge) {
 	print<<EOD;
 		Unable to find an fpurge function in your INCLUDE path 
 		files. fpurge isn't required, but will result in MUCH
@@ -121,7 +139,7 @@ EOD
 		my $pathstr = prompt("Additional header search paths:", "");
 		if (length $pathstr) {
 			search_paths($pathstr);
-			search_files();
+			search_for_fpurge();
 		} else {
 			last;
 		}
@@ -131,7 +149,9 @@ $INCLUDE = $stdio_dir if defined $stdio_dir;
 $INCLUDE = $stdio_ext_dir if defined $stdio_ext_dir;
 my $include_string = "-I.";
 $include_string .= $INCLUDE if defined $INCLUDE;
-my $DEFINE = '-DHAS'.uc($fpurge);
+my $DEFINE;
+$DEFINE .= '-DHAS'.uc($fpurge) if defined($fpurge);
+$DEFINE .= ' -DHAS'.uc($clock_gettime) if defined($clock_gettime);
 $DEFINE .= ' -DHAS_STDIO_EXT_H' if defined $stdio_ext_dir;
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
