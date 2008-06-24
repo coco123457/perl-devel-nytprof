@@ -213,3 +213,9 @@ and require an option to save them all (which could make the data file very larg
 
 Add % of total time to index page
 Remove bottom stats.
+
+Use clock_gettime(CLOCK_MONOTONIC) if available, else clock_gettime(CLOCK_REALTIME).
+Those calls are cheaper than gettimeofday and can give nanosecond resolution.
+
+Use opcode redirection instead of DB::DB to measure statements as that avoids the
+cost of a sub call per statement.
