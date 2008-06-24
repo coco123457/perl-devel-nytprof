@@ -90,16 +90,15 @@ sub search_for_fpurge {
 
 my $clock_gettime;
 sub search_for_clock_gettime {
-	if (defined $time_dir) {
-		open(TIMEH, "$cpp $time_dir/time.h |");
-                while (<TIMEH>) {
-			if (m/(clock_gettime)\s*\(/go) {
-				$clock_gettime = $1;
-                                last;
-                        }
-                }
-                close TIMEH;
-        } 
+	return if not $time_dir;
+	open(TIMEH, "$cpp $time_dir/time.h |");
+	while (<TIMEH>) {
+		if (m/(clock_gettime)\s*\(/go) {
+			$clock_gettime = $1;
+			last;
+		}
+	}
+	close TIMEH;
 }
 
 sub verify_fpurge {
@@ -151,13 +150,11 @@ my $include_string = "-I.";
 $include_string .= $INCLUDE if defined $INCLUDE;
 my $DEFINE;
 $DEFINE .= '-DHAS'.uc($fpurge) if defined($fpurge);
-$DEFINE .= ' -DHAS'.uc($clock_gettime) if defined($clock_gettime);
+$DEFINE .= ' -DHAS'.uc($clock_gettime) if $clock_gettime;
 $DEFINE .= ' -DHAS_STDIO_EXT_H' if defined $stdio_ext_dir;
 
 my @LIBS = ();
-if (defined($clock_gettime)) {
-    push @LIBS, "-lrt";
-}
+push @LIBS, "-lrt" if $clock_gettime;
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
@@ -173,7 +170,7 @@ WriteMakefile(
     PREREQ_PM         => {
     	  'Getopt::Long'    => 0,
     	}, # e.g., Module::Name => 1.1
-    LIBS              => @LIBS,
+    LIBS              => \@LIBS,
     EXE_FILES					=> [ 'bin/nytprofhtml', 'bin/nytprofcsv' ],
     MAN1PODS					=> { 'bin/nytprofhtml' => '$(INST_MAN1DIR)/nytprofhtml.1',
 													'bin/nytprofcsv' => '$(INST_MAN1DIR)/nytprofcsv.1' },
@@ -207,4 +204,4 @@ checkpod:
 }
 
 
-# vim:ts=2:sw=2
+# vim:ts=2:sw=2:sts=0:noexpandtab
