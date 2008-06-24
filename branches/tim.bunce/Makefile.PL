@@ -154,6 +154,11 @@ $DEFINE .= '-DHAS'.uc($fpurge) if defined($fpurge);
 $DEFINE .= ' -DHAS'.uc($clock_gettime) if defined($clock_gettime);
 $DEFINE .= ' -DHAS_STDIO_EXT_H' if defined $stdio_ext_dir;
 
+my @LIBS = ();
+if (defined($clock_gettime)) {
+    push @LIBS, "-lrt";
+}
+
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 my %mm_opts;
@@ -168,7 +173,7 @@ WriteMakefile(
     PREREQ_PM         => {
     	  'Getopt::Long'    => 0,
     	}, # e.g., Module::Name => 1.1
-    LIBS              => [''], # e.g., '-lm'
+    LIBS              => @LIBS,
     EXE_FILES					=> [ 'bin/nytprofhtml', 'bin/nytprofcsv' ],
     MAN1PODS					=> { 'bin/nytprofhtml' => '$(INST_MAN1DIR)/nytprofhtml.1',
 													'bin/nytprofcsv' => '$(INST_MAN1DIR)/nytprofcsv.1' },
