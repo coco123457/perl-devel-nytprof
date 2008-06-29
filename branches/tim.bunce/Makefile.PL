@@ -12,15 +12,22 @@
 use 5.006000;
 use warnings;
 use strict;
+
 use ExtUtils::MakeMaker;
+use Getopt::Long;
 use Config;
 
 # --- Bail out on Windows
 if ($^O eq 'MSWin32') {
 	print "This module does not support Windows because of NYTProf.xs.\n"
-				."Feel free to port it and submit a patch to akaplan\@cpan.org\n";
+				."Feel free to port it and submit a patch to develnytprof-dev\@googlegroups.com\n";
 	die "No support for OS";
 }
+
+# --- Options
+GetOptions(
+	'pg!' => \my $opt_pg,
+) or exit 1;
 
 # --- Discover how much of stdio is implemented
 
@@ -161,6 +168,7 @@ push @LIBS, "-lrt" if $clock_gettime;
 my %mm_opts;
 $mm_opts{LICENSE} = 'perl' if $ExtUtils::MakeMaker::VERSION >= 6.3002;
 #$mm_opts{OPTIMIZE} = '-g' if -d '.svn';
+$mm_opts{CCFLAGS}  = "-pg" if $opt_pg;
 
 WriteMakefile(
     NAME              => 'Devel::NYTProf',
