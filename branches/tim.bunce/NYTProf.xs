@@ -104,7 +104,7 @@ static unsigned int ticks_per_sec = 0; /* 0 forces error if not set */
 /* prototypes */
 static void write_cached_fids();
 void print_header(pTHX);
-unsigned int get_file_id(char*, STRLEN, int);
+unsigned int get_file_id(pTHX_ char*, STRLEN, int);
 void output_int(unsigned int);
 void DB(pTHX);
 void set_option(const char*, const char*);
@@ -287,9 +287,8 @@ write_cached_fids() {
  * get_file_id recurses to process the 'embedded' file name first.
  */
 unsigned int
-get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
+get_file_id(pTHX_ char* file_name, STRLEN file_name_len, int create_new) {
 
-	dTHX;
 	Hash_entry entry, *found;
 
 	/* AutoLoader adds some information to Perl's internal file name that we have
@@ -320,7 +319,7 @@ get_file_id(char* file_name, STRLEN file_name_len, int create_new) {
 				return 0;
 			}
 			++start; /* move past [ */
-			found->eval_fid = get_file_id(start, end - start, create_new);	/* recurse */
+			found->eval_fid = get_file_id(aTHX_ start, end - start, create_new);	/* recurse */
 			found->eval_line_num = atoi(end+1);
 		}
 
@@ -676,7 +675,7 @@ DB(pTHX) {
 	}
 
 	file = OutCopFILE(cop);
-	last_executed_file = get_file_id(file, strlen(file), 1);
+	last_executed_file = get_file_id(aTHX_ file, strlen(file), 1);
 	last_executed_line = CopLINE(cop);
 
   if (profile_blocks) {
@@ -829,7 +828,7 @@ pp_entersub_profiler(pTHX) {
 		/* get line, file, and fid for statement *before* the call */
 		char *file = OutCopFILE(PL_curcop);
 		int line = CopLINE(PL_curcop);
-		unsigned int fid = get_file_id(file, strlen(file), 1);
+		unsigned int fid = get_file_id(aTHX_ file, strlen(file), 1);
 		char fid_line_key[50];
 
 		/* get name of sub we've just entered */
@@ -838,10 +837,6 @@ pp_entersub_profiler(pTHX) {
 		SV *sv_tmp;
 
 		int fid_line_key_len = my_snprintf(fid_line_key, sizeof(fid_line_key), "%u:%d", fid, line);
-#if 0
-		fprintf(stderr, "PL_curcop %p %d %p (op_next %p)\n", cxstack, 
-										cxstack_ix, PL_curcop, next_op);
-#endif
 		if (isGV(cvgv)) {
 			gv_efullname3(subname_sv, cvgv, Nullch);
 		}
@@ -1005,7 +1000,7 @@ write_sub_line_ranges(pTHX_ int fids_only) {
 		if (!first_line && !last_line && strstr(sub_name, "::BEGIN"))
 			continue;	/* no point writing these */
 
-		fid = get_file_id(file_lines, first - file_lines, 0);
+		fid = get_file_id(aTHX_ file_lines, first - file_lines, 0);
 		if (!fid)  /* no point in writing subs in files we've not profiled */
 			continue;
 		if (fids_only)  /* caller just wants fids assigned */
