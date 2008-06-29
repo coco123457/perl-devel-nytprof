@@ -21,21 +21,22 @@ GetOptions(
     'v|verbose' => \my $opt_verbose,
 ) or exit 1;
 
+my $subs_count = shift || 1000;
+my $loop_count = shift || 1000;
 
 # simple benchmark script to measure profiling overhead
 my $test_script = "benchmark_code.pl";
 open my $fh, ">", $test_script or die "Can't write to $test_script: $!\n";
 print $fh q{
+    my $subs_count = shift || die "No subs count";
+    my $loop_count = shift || die "No loop count";
     sub foo {
         my $loop = shift;
         my $a = 0;
-        while ($loop-- > 0) {
-            ++$a;
-        }
+        while ($loop-- > 0) { ++$a; ++$a; ++$a; }
     }
-    my $subs = 1000;
-    while ($subs-- > 0) {
-        foo(1000)
+    while ($subs_count-- > 0) {
+        foo($loop_count)
     }
 };
 close $fh or die "Error writing to $test_script: $!\n";
@@ -75,7 +76,7 @@ while ( my ($testname, $testinfo) = each %tests ) {
     $test_subs{$testname} = sub { run_test($testinfo) };
 }
 
-timethese(4, \%test_subs, 'nop');
+cmpthese(4, \%test_subs, 'nop');
 
 while ( my ($testname, $testinfo) = each %tests ) {
     if ($testinfo->{datafile}) {
@@ -93,6 +94,6 @@ sub run_test {
     my $env = $testinfo->{env};
     local $ENV{$env->[0]} = $env->[1] if $env;
 
-    my $cmd = "perl $testinfo->{perlargs} $test_script";
+    my $cmd = "perl $testinfo->{perlargs} $test_script $subs_count $loop_count";
     system($cmd) == 0 or die "$cmd failed";
 }
