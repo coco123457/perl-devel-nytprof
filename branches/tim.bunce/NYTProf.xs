@@ -83,6 +83,7 @@ static bool profile_blocks = 0;
 /* options and overrides */
 static char PROF_output_file[MAXPATHLEN+1] = "nytprof.out";
 static bool embed_fid_line = 0;
+static int use_db_sub = 1;
 static int trace_level = 0;
 
 /* time tracking */
@@ -114,8 +115,10 @@ HV *load_profile_data_from_stream();
 AV *store_profile_line_entry(pTHX_ SV *rvav, unsigned int line_num, 
 															double time, int count, unsigned int fid);
 
-OP *pp_entersub_profiler(pTHX);
-OP *(*pp_entersub_orig)(pTHX);
+OP *pp_nextstate_profiler(pTHX); OP *(*pp_nextstate_orig)(pTHX);
+OP *pp_setstate_profiler(pTHX);  OP *(*pp_setstate_orig)(pTHX);
+OP *pp_dbstate_profiler(pTHX);   OP *(*pp_dbstate_orig)(pTHX);
+OP *pp_entersub_profiler(pTHX);  OP *(*pp_entersub_orig)(pTHX);
 HV *sub_callers_hv;
 
 /* macros for outputing profile data */
@@ -678,11 +681,11 @@ DB(pTHX) {
 	last_executed_file = get_file_id(aTHX_ file, strlen(file), 1);
 	last_executed_line = CopLINE(cop);
 
-  if (profile_blocks) {
-		if (trace_level >= 4)
-			warn("\tlooking for block and sub lines for %u:%u\n", last_executed_file, 
-						last_executed_line);
+	if (trace_level >= 4)
+		warn("     @%d:%-4d %s\n", last_executed_file, last_executed_line,
+			(profile_blocks) ? "looking for block and sub lines" : "");
 
+  if (profile_blocks) {
 		last_block_line = 0;
 		last_sub_line   = 0;
 		visit_contexts(aTHX_ ~0, &_check_context);
@@ -724,6 +727,9 @@ set_option(const char* option, const char* value) {
 	else if (strEQ(option, "trace")) {
 		trace_level = atoi(value);
 	}
+	else if (strEQ(option, "use_db_sub")) {
+		use_db_sub = atoi(value);
+	}
 	else {
 		warn("Unknown option: %s\n", option);
 		return;
@@ -743,7 +749,7 @@ open_output_file(pTHX_ char *filename) {
 	const char *mode = "wb";
 	int fd = -2;
 
-	if (out && SvIV(PL_DBsingle)) {	/* already opened so assume forking */
+	if (out && (!use_db_sub || SvIV(PL_DBsingle))) {	/* already opened so assume forking */
 		sprintf(filename_buf, "%s.%d", filename, getpid());
 		filename = filename_buf;
 	}
@@ -769,7 +775,8 @@ open_output_file(pTHX_ char *filename) {
 
 	if (!out) {	/* failed to open */
 		/* disable profiling */
-		sv_setiv(PL_DBsingle, 0);
+		if (use_db_sub)
+			sv_setiv(PL_DBsingle, 0);
 		croak("Failed to open output '%s': %s", filename, strerror(errno));
 	}
 
@@ -803,6 +810,14 @@ intercept_opcodes(pTHX) {
 	sub_callers_hv = newHV();
 	pp_entersub_orig = PL_ppaddr[OP_ENTERSUB];
 	PL_ppaddr[OP_ENTERSUB] = pp_entersub_profiler;
+	if (!use_db_sub) {
+		pp_nextstate_orig = PL_ppaddr[OP_NEXTSTATE];
+		PL_ppaddr[OP_NEXTSTATE] = pp_nextstate_profiler;
+		pp_setstate_orig = PL_ppaddr[OP_SETSTATE];
+		PL_ppaddr[OP_SETSTATE] = pp_setstate_profiler;
+		pp_dbstate_orig = PL_ppaddr[OP_DBSTATE];
+		PL_ppaddr[OP_DBSTATE] = pp_dbstate_profiler;
+	}
 }
 
 OP *
@@ -823,7 +838,7 @@ pp_entersub_profiler(pTHX) {
 	op = pp_entersub_orig(aTHX);
 
 	/* have entered a sub and we're profiling */
-	if (op != next_op && prev_cop && SvTRUE(PL_DBsingle)) {
+	if (op != next_op && prev_cop && (!use_db_sub || SvTRUE(PL_DBsingle))) {
 
 		/* get line, file, and fid for statement *before* the call */
 		char *file = OutCopFILE(PL_curcop);
@@ -858,6 +873,13 @@ pp_entersub_profiler(pTHX) {
 	}
 	return op;
 }
+
+OP *
+pp_nextstate_profiler(pTHX) { OP *op=pp_nextstate_orig(aTHX); warn("ns"); DB(aTHX); return op; }
+OP *
+pp_setstate_profiler(pTHX) {  OP *op=pp_setstate_orig(aTHX);  warn("ss"); DB(aTHX); return op; }
+OP *
+pp_dbstate_profiler(pTHX) {   OP *op=pp_dbstate_orig(aTHX);   warn("db"); DB(aTHX); return op; }
 
 
 /************************************
@@ -1406,7 +1428,9 @@ void
 DB(...)
 	CODE:
 		PERL_UNUSED_VAR(items);
-		DB(aTHX);
+		if (use_db_sub)
+			DB(aTHX);
+	  else if (0) warn("DB called");
 
 void
 set_option(const char *opt, const char *value)
@@ -1437,7 +1461,8 @@ _finish(...)
 	PPCODE:
 	if (trace_level)
 		warn("_finish (last_pid %d, getpid %d)\n", last_pid, getpid());
-	sv_setiv(PL_DBsingle, 0);
+	if (use_db_sub)
+		sv_setiv(PL_DBsingle, 0);
 	DB(aTHX); /* write data for final statement */
 	if (out) {
 		write_sub_line_ranges(aTHX_ 0);
