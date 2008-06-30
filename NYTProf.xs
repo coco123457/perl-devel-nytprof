@@ -75,8 +75,6 @@ static Hash_table hashtable = { NULL, MAX_HASH_SIZE, NULL, NULL };
 /* defaults */
 static FILE* out;
 static FILE* in;
-static pid_t first_pid;
-static pid_t last_pid;
 static bool usecputime = 0;
 static bool profile_blocks = 0;
 
@@ -98,6 +96,7 @@ static unsigned int last_executed_line;
 static unsigned int last_executed_file;
 static unsigned int last_block_line;
 static unsigned int last_sub_line;
+static pid_t last_pid;
 
 /* reader module variables */
 static unsigned int ticks_per_sec = 0; /* 0 forces error if not set */
@@ -625,6 +624,33 @@ _check_context(pTHX_ PERL_CONTEXT *cx, UV *stop_at_ptr)
 	return 0;
 }
 
+/* copied from perl's S_closest_cop in util.c as used by warn(...) */
+
+static const COP*
+closest_cop(pTHX_ const COP *cop, const OP *o)
+{
+    dVAR;
+    /* Look for PL_op starting from o.  cop is the last COP we've seen. */
+    if (!o || o == PL_op)
+        return cop;
+    if (o->op_flags & OPf_KIDS) {
+        const OP *kid;
+        for (kid = cUNOPo->op_first; kid; kid = kid->op_sibling) {
+            const COP *new_cop;
+            /* If the OP_NEXTSTATE has been optimised away we can still use it
+             * the get the file and line number. */
+            if (kid->op_type == OP_NULL && kid->op_targ == OP_NEXTSTATE)
+                cop = (const COP *)kid;
+            /* Keep searching, and return when we've found something. */
+            new_cop = closest_cop(aTHX_ cop, kid);
+            if (new_cop)
+                return new_cop;
+        }
+    }
+    /* Nothing found. */
+    return NULL;
+}
+
 
 /**
  * PerlDB implementation. Called before each breakable statement
@@ -677,9 +703,19 @@ DB(pTHX) {
 		}
 	}
 
+	cop = PL_curcop;
+	if ( (last_executed_line = CopLINE(cop)) == 0 ) {
+		/* Might be a cop that has been optimised away.  We can try to find such a
+		 * cop by searching through the optree starting from the sibling of PL_curcop.
+		 * See Perl_vmess in perl's util.c for how warn("...") finds the line number.
+		 */
+		cop = closest_cop(aTHX_ cop, cop->op_sibling);
+		if (!cop)
+			cop = PL_curcop;
+		last_executed_line = CopLINE(cop);
+	}
 	file = OutCopFILE(cop);
 	last_executed_file = get_file_id(aTHX_ file, strlen(file), 1);
-	last_executed_line = CopLINE(cop);
 
 	if (trace_level >= 4)
 		warn("     @%d:%-4d %s\n", last_executed_file, last_executed_line,
@@ -875,11 +911,11 @@ pp_entersub_profiler(pTHX) {
 }
 
 OP *
-pp_nextstate_profiler(pTHX) { OP *op=pp_nextstate_orig(aTHX); warn("ns"); DB(aTHX); return op; }
+pp_nextstate_profiler(pTHX) { OP *op=pp_nextstate_orig(aTHX); DB(aTHX); return op; }
 OP *
-pp_setstate_profiler(pTHX) {  OP *op=pp_setstate_orig(aTHX);  warn("ss"); DB(aTHX); return op; }
+pp_setstate_profiler(pTHX) {  OP *op=pp_setstate_orig(aTHX);  DB(aTHX); return op; }
 OP *
-pp_dbstate_profiler(pTHX) {   OP *op=pp_dbstate_orig(aTHX);   warn("db"); DB(aTHX); return op; }
+pp_dbstate_profiler(pTHX) {   OP *op=pp_dbstate_orig(aTHX);   DB(aTHX); return op; }
 
 
 /************************************
@@ -895,7 +931,7 @@ init_profiler(pTHX) {
 	/* Save the process id early. We can monitor it to detect forks that affect 
 		 output buffering.
 		 NOTE: don't fork before calling the xsloader obviously! */
-	last_pid = first_pid = getpid();
+	last_pid = getpid();
 
 	if (trace_level)
 		warn("NYTProf init pid %d\n", last_pid);
@@ -916,7 +952,7 @@ init_profiler(pTHX) {
 	/* END { _finish() } */
 	if (!PL_endav)
 		PL_endav = newAV();
-	av_push(PL_endav, get_cv("DB::_finish", GV_ADDWARN));
+	av_push(PL_endav, (SV *)get_cv("DB::_finish", GV_ADDWARN));
 
 	/* seed first run time */
 	if (usecputime) {
