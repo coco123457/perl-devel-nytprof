@@ -9,7 +9,7 @@ BEGIN {
     # of those modules.
 
     if (!$ENV{NYTPROF}) {
-	    $ENV{NYTPROF} = "trace=1:file=/tmp/nytprof.$$.out";
+	    $ENV{NYTPROF} = "file=/tmp/nytprof.$$.out";
 	    warn "Defaulting NYTPROF env var to '$ENV{NYTPROF}'";
     }
 
