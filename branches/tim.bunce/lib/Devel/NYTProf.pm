@@ -24,9 +24,7 @@ package	# hide the package from the PAUSE indexer
 	    | 0x100 # informative "file" names for evals
 	    | 0x200;# informative names for anonymous subroutines
 
-	# XXX in theory these options aren't needed unless use_db_sub is true
-	# but the results are currently very odd without them.
-	# Looks like a side-effect of the perl optimizer.
+	# only needed if use_db_sub is enabled
 	$^P |=0x002 # line-by-line profiling (if $DB::single true)
 	    | 0x020 # start (after BEGINs) with single-step on
 			if 1;
