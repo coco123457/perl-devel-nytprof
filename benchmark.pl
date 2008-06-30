@@ -14,6 +14,7 @@ use warnings;
 use strict;
 
 use Carp;
+use Config;
 use Getopt::Long;
 use Benchmark qw(:hireswallclock timethese cmpthese);
 
@@ -52,7 +53,7 @@ my %tests = (
         datafile => 'tmon.out',
     },
     fastprof => {
-        perlargs => '-d:FastProf',
+        perlargs => '-MDevel::FastProf',
         datafile => 'fastprof.out',
     },
     profit => {
@@ -72,9 +73,19 @@ my %tests = (
 
 my %test_subs;
 while ( my ($testname, $testinfo) = each %tests ) {
+    if (!run_test($testinfo, 1, 1)) {
+        warn "Can't run $testname profiler - skipped\n";
+        next;
+    }
     $testinfo->{testname} = $testname;
-    $test_subs{$testname} = sub { run_test($testinfo) };
+    $test_subs{$testname} = sub { run_test($testinfo, $subs_count, $loop_count) };
 }
+
+printf "Profiler performance using perl %8s %s (%s %s %s)\n",
+    $], $Config{archname},
+    $Config{gccversion} ? 'gcc' : $Config{cc},
+    (split / /, $Config{gccversion}||$Config{ccversion}||'')[0]||'',
+    $Config{optimize};
 
 cmpthese(4, \%test_subs, 'nop');
 
@@ -89,11 +100,11 @@ while ( my ($testname, $testinfo) = each %tests ) {
 exit 0;
 
 sub run_test {
-    my $testinfo = shift;
+    my($testinfo, $subs_count, $loop_count) = @_;
 
     my $env = $testinfo->{env};
     local $ENV{$env->[0]} = $env->[1] if $env;
 
     my $cmd = "perl $testinfo->{perlargs} $test_script $subs_count $loop_count";
-    system($cmd) == 0 or die "$cmd failed";
+    system($cmd) == 0;
 }
