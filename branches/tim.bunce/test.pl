@@ -32,9 +32,11 @@ my %SKIP_TESTS = (
 	'test15' => ($] >= 5.008) ? 1 : 0,
 );
 
-my %opts;
+my %opts = (
+	profperlopts => '-d:NYTProf',
+);
 GetOptions(\%opts,
-	qw/p=s I=s v|verbose d|debug html/
+	qw/p=s I=s v|verbose d|debug html profperlopts=s/
 ) or exit 1;
 
 $opts{v} ||= $opts{d};
@@ -148,9 +150,8 @@ sub profile {
 	local $ENV{NYTPROF} = join ":", @NYTPROF;
 	print "NYTPROF=$ENV{NYTPROF}\n" if $opts{v} && $ENV{NYTPROF};
 
-	my @results = run_command("$perl -d:NYTProf $test");
+	my @results = run_command("$perl $opts{profperlopts} $test");
 	pass($test); # mainly to show progress
-	#print timestr( $t_total, 'nop' ), "\n";
 }
 
 
@@ -277,8 +278,9 @@ sub verify_report {
 		my $c0 = $2;
 		my $tc0 = $3;
 
-		if (defined $expected[$index] and
-			0 != $expected[$index] =~ s/^\|([0-9.]+)\|(.*)/0$2/
+		if (defined $expected[$index]
+		   and 0 != $expected[$index] =~ s/^\|([0-9.]+)\|(.*)/0$2/
+		   and $c0 # protect against div-by-0 in some error situations
 		) {
 			push @accuracy_errors, "$test line $index: got $t0 expected ~$1 for time"
 				if abs($1 - $t0) > 0.2; # Test times. expected to be within 200ms
