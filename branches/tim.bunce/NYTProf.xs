@@ -913,6 +913,11 @@ init_profiler(pTHX) {
 
 	intercept_opcodes(aTHX);
 
+	/* END { _finish() } */
+	if (!PL_endav)
+		PL_endav = newAV();
+	av_push(PL_endav, get_cv("DB::_finish", GV_ADDWARN));
+
 	/* seed first run time */
 	if (usecputime) {
 		times(&start_ctime);
@@ -1435,10 +1440,11 @@ DB(...)
 void
 set_option(const char *opt, const char *value)
 
-void
+int
 init_profiler()
 	CODE:
 		init_profiler(aTHX);
+		XSRETURN_IV(1);
 
 void
 enable_profile(...)

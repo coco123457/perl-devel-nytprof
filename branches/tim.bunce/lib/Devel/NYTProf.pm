@@ -14,7 +14,6 @@ package Devel::NYTProf;
 package	# hide the package from the PAUSE indexer
 	DB;
 
-BEGIN {
 	# setting $^P non-zero automatically initializes perl debugging internals
 	# (mg.c calls init_debugger) if $DB::single is false. This is handy for
 	# situations like mod_perl where perl wasn't started with -d flag.
@@ -40,11 +39,11 @@ BEGIN {
 		*DB = sub { goto &_DB }
 	}
 
-	init_profiler();
+	init_profiler(); # provides true return value for module
 
-	#$DB::single = 1; # enable profiling of remaining compile-time execution
-	# put nothing here
-}
+	# put nothing here!
+
+__END__
 
 =for comment from perlvar
 
@@ -69,15 +68,6 @@ BEGIN {
 	time only.  This is a new mechanism and the details may change.
 =cut
 
-END {
-	# cleanup
-	#warn sprintf 'END Devel::NYTProf $$=%d\n', $$; # $$ may not be true pid
-	_finish();
-}
-
-
-1;
-__END__
 =head1 NAME
 
 Devel::NYTProf - line-by-line code profiler and report generator
