@@ -21,8 +21,14 @@
 #endif
 
 #if (PERL_VERSION < 8) || ((PERL_VERSION == 8) && (PERL_SUBVERSION < 8))
-#undef PL_curcop
-#define PL_curcop ((cxstack + cxstack_ix)->blk_oldcop)
+/* If we're using DB::DB() instead of opcode redirection with an old perl
+ * then PL_curcop in DB() will refer to the DB() wrapper in Devel/NYTProf.pm
+ * so we'd have to crawl the stack to find the right cop. However, for some
+ * reason that I don't pretend to understand the folowing expression works:
+ */
+#define PL_curcop_nytprof (use_db_sub ? ((cxstack + cxstack_ix)->blk_oldcop) : PL_curcop)
+#else
+#define PL_curcop_nytprof PL_curcop
 #endif
 
 #if !defined(OutCopFILE)
@@ -96,6 +102,7 @@ static unsigned int last_executed_line;
 static unsigned int last_executed_file;
 static unsigned int last_block_line;
 static unsigned int last_sub_line;
+static unsigned int is_finishing;
 static pid_t last_pid;
 
 /* reader module variables */
@@ -659,7 +666,7 @@ void
 DB(pTHX) {
 	char *file;
 	unsigned int elapsed;
-	COP *cop = PL_curcop;
+	COP *cop;
 
 	if (usecputime) {
 		times(&end_ctime);
@@ -696,14 +703,8 @@ DB(pTHX) {
 						last_executed_line, elapsed, last_block_line, last_sub_line);
 
 	}
-	else {
-		if (trace_level >= 1) {
-			warn("NYTProf pid %d: first statement line %d of %s",
-				getpid(), CopLINE(cop), OutCopFILE(cop));
-		}
-	}
 
-	cop = PL_curcop;
+	cop = PL_curcop_nytprof;
 	if ( (last_executed_line = CopLINE(cop)) == 0 ) {
 		/* Might be a cop that has been optimised away.  We can try to find such a
 		 * cop by searching through the optree starting from the sibling of PL_curcop.
@@ -711,14 +712,26 @@ DB(pTHX) {
 		 */
 		cop = closest_cop(aTHX_ cop, cop->op_sibling);
 		if (!cop)
-			cop = PL_curcop;
+			cop = PL_curcop_nytprof;
 		last_executed_line = CopLINE(cop);
+		if (!last_executed_line) { /* typically when _finish called by END */
+			if (!is_finishing)
+				warn("Unable to determine line number in %s", OutCopFILE(cop));
+			last_executed_line = 1; /* don't want zero line numbers in data */
+		}
 	}
+
 	file = OutCopFILE(cop);
+	if (!last_executed_file) {	/* first time */
+		if (trace_level >= 1) {
+			warn("NYTProf pid %d: first statement line %d of %s",
+				getpid(), CopLINE(cop), OutCopFILE(cop));
+		}
+	}
 	last_executed_file = get_file_id(aTHX_ file, strlen(file), 1);
 
 	if (trace_level >= 4)
-		warn("     @%d:%-4d %s\n", last_executed_file, last_executed_line,
+		warn("     @%d:%-4d %s", last_executed_file, last_executed_line,
 			(profile_blocks) ? "looking for block and sub lines" : "");
 
   if (profile_blocks) {
@@ -925,6 +938,7 @@ pp_dbstate_profiler(pTHX) {   OP *op=pp_dbstate_orig(aTHX);   DB(aTHX); return o
 /* Initial setup */
 void
 init_profiler(pTHX) {
+	is_finishing = 0;
 	HV* hash = get_hv("DB::sub", 0);
 	unsigned int hashtable_memwidth;
 
@@ -1501,6 +1515,7 @@ disable_profile(...)
 void
 _finish(...)
 	PPCODE:
+	is_finishing = 1;
 	if (trace_level)
 		warn("_finish (last_pid %d, getpid %d)\n", last_pid, getpid());
 	if (use_db_sub)
