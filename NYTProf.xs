@@ -893,8 +893,12 @@ pp_entersub_profiler(pTHX) {
 		/* else have returned from XS so use sub_sv for name */
 
 		/* determine the original fully qualified name for sub */
-		cv = (isGV(sub_sv)) ? GvCV(sub_sv) : (CV *)sub_sv;
-		if (cv && CvGV(cv)) {
+		/* XXX hacky with lots of obscure edge cases */
+		/* basically needs to be clone of first part of pp_entersub, but isn't */
+		if (SvROK(sub_sv))
+			sub_sv = SvRV(sub_sv);
+		cv = (isGV(sub_sv)) ? GvCV(sub_sv) : (SvTYPE(sub_sv) == SVt_PVCV) ? (CV *)sub_sv : NULL;
+		if (cv && CvGV(cv) && GvSTASH(CvGV(cv))) {
 			/* for a plain call of an imported sub the GV is of the current
 				* package, so we dig to find the original package
 				*/
@@ -904,10 +908,20 @@ pp_entersub_profiler(pTHX) {
 		else if (isGV(sub_sv)) {
 			gv_efullname3(subname_sv, (GV *)sub_sv, Nullch);
 		}
+		else if (SvTYPE(sub_sv) == SVt_PVCV) {
+			/* unnamed CV, e.g. seen in mod_perl. XXX do better? */
+			sv_setpvn(subname_sv, "__ANON__", 8);
+		}
+		else if (SvTYPE(sub_sv) == SVt_PV
+				/* Errno.pm does &$errname and sub_sv is PVIV! with POK */
+			|| SvPOK(sub_sv)
+		) {
+			sv_setsv(subname_sv, sub_sv);
+		}
 		else {
 			char *what = (op == next_op) ? "xs" : "sub";
-			warn("unknown entersub %s id '%s'", what, SvPV_nolen(sub_sv));
-			if (trace_level)
+			warn("unknown entersub %s '%s'", what, SvPV_nolen(sub_sv));
+			if (trace_level || 1)
 				sv_dump(sub_sv);
 			sv_setpvf(subname_sv, "(unknown %s %s)", what, SvPV_nolen(sub_sv));
 		}
