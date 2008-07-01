@@ -19,6 +19,9 @@
 #   define NEED_my_snprintf
 #   include "ppport.h"
 #endif
+#if !defined(OutCopFILE)
+#    define OutCopFILE CopFILE
+#endif
 
 #if (PERL_VERSION < 8) || ((PERL_VERSION == 8) && (PERL_SUBVERSION < 8))
 /* If we're using DB::DB() instead of opcode redirection with an old perl
@@ -29,10 +32,6 @@
 #define PL_curcop_nytprof (use_db_sub ? ((cxstack + cxstack_ix)->blk_oldcop) : PL_curcop)
 #else
 #define PL_curcop_nytprof PL_curcop
-#endif
-
-#if !defined(OutCopFILE)
-#define OutCopFILE CopFILE
 #endif
 
 #include <sys/time.h>
@@ -88,6 +87,7 @@ static bool profile_blocks = 0;
 static char PROF_output_file[MAXPATHLEN+1] = "nytprof.out";
 static bool embed_fid_line = 0;
 static int use_db_sub = 1;
+static int profile_begin = 0;
 static int trace_level = 0;
 
 /* time tracking */
@@ -102,6 +102,7 @@ static unsigned int last_executed_line;
 static unsigned int last_executed_file;
 static unsigned int last_block_line;
 static unsigned int last_sub_line;
+static unsigned int is_profiling;
 static unsigned int is_finishing;
 static pid_t last_pid;
 
@@ -115,6 +116,8 @@ unsigned int get_file_id(pTHX_ char*, STRLEN, int);
 void output_int(unsigned int);
 void DB(pTHX);
 void set_option(const char*, const char*);
+static int enable_profile(pTHX);
+static int disable_profile(pTHX);
 void open_output_file(pTHX_ char *);
 int reinit_if_forked(pTHX);
 HV *load_profile_data_from_stream();
@@ -767,6 +770,9 @@ set_option(const char* option, const char* value) {
 	else if (strEQ(option, "usecputime")) {
 		usecputime = 1;
 	}
+	else if (strEQ(option, "begin")) {
+		profile_begin = atoi(value);
+	}
 	else if (strEQ(option, "blocks")) {
 		profile_blocks = 1;
 	}
@@ -798,7 +804,7 @@ open_output_file(pTHX_ char *filename) {
 	const char *mode = "wb";
 	int fd = -2;
 
-	if (out && (!use_db_sub || SvIV(PL_DBsingle))) {	/* already opened so assume forking */
+	if (out) {	/* already opened so assume forking */
 		sprintf(filename_buf, "%s.%d", filename, getpid());
 		filename = filename_buf;
 	}
@@ -823,9 +829,7 @@ open_output_file(pTHX_ char *filename) {
 	}
 
 	if (!out) {	/* failed to open */
-		/* disable profiling */
-		if (use_db_sub)
-			sv_setiv(PL_DBsingle, 0);
+		disable_profile(aTHX);
 		croak("Failed to open output '%s': %s", filename, strerror(errno));
 	}
 
@@ -854,28 +858,13 @@ reinit_if_forked(pTHX) {
  * Sub caller tracking
  ************************************/
 
-void
-intercept_opcodes(pTHX) {
-	sub_callers_hv = newHV();
-	pp_entersub_orig = PL_ppaddr[OP_ENTERSUB];
-	PL_ppaddr[OP_ENTERSUB] = pp_entersub_profiler;
-	if (!use_db_sub) {
-		pp_nextstate_orig = PL_ppaddr[OP_NEXTSTATE];
-		PL_ppaddr[OP_NEXTSTATE] = pp_nextstate_profiler;
-		pp_setstate_orig = PL_ppaddr[OP_SETSTATE];
-		PL_ppaddr[OP_SETSTATE] = pp_setstate_profiler;
-		pp_dbstate_orig = PL_ppaddr[OP_DBSTATE];
-		PL_ppaddr[OP_DBSTATE] = pp_dbstate_profiler;
-	}
-}
-
 OP *
 pp_entersub_profiler(pTHX) {
 	OP *op;
 	COP *prev_cop = NULL;
 	OP *next_op = PL_op->op_next; /* op to execute after sub returns */
 
-	if (cxstack_ix >= 0)	/* dodge wierdness */
+	if (cxstack_ix >= 0)	/* dodge wierdness XXX investigate */
 		prev_cop = PL_curcop;
 
 	/*
@@ -887,7 +876,7 @@ pp_entersub_profiler(pTHX) {
 	op = pp_entersub_orig(aTHX);
 
 	/* have entered a sub and we're profiling */
-	if (op != next_op && prev_cop && (!use_db_sub || SvTRUE(PL_DBsingle))) {
+	if (op != next_op && prev_cop && is_profiling) {
 
 		/* get line, file, and fid for statement *before* the call */
 		char *file = OutCopFILE(PL_curcop);
@@ -935,23 +924,48 @@ pp_dbstate_profiler(pTHX) {   OP *op=pp_dbstate_orig(aTHX);   DB(aTHX); return o
  * Shared Reader,NYTProf Functions  *
  ************************************/
 
+static int
+enable_profile(pTHX)
+{
+	int prev_is_profiling = is_profiling;
+	if (trace_level)
+		warn("NYTProf enable_profile%s", (prev_is_profiling)?" (already enabled)":"");
+	is_profiling = 1;
+	if (use_db_sub)
+		sv_setiv(PL_DBsingle, 1);
+	return prev_is_profiling;
+}
+
+static int
+disable_profile(pTHX)
+{
+	int prev_is_profiling = is_profiling;
+	sv_setiv(PL_DBsingle, 0);
+	is_profiling = 0;
+	if (out)
+		fflush(out);
+	if (trace_level)
+		warn("NYTProf disable_profile");
+	return prev_is_profiling;
+}
+
 /* Initial setup */
-void
+int
 init_profiler(pTHX) {
-	is_finishing = 0;
-	HV* hash = get_hv("DB::sub", 0);
 	unsigned int hashtable_memwidth;
 
 	/* Save the process id early. We can monitor it to detect forks that affect 
 		 output buffering.
 		 NOTE: don't fork before calling the xsloader obviously! */
 	last_pid = getpid();
+	is_finishing = 0;
 
 	if (trace_level)
 		warn("NYTProf init pid %d\n", last_pid);
 
-	if (hash == NULL) {
-		croak("Debug symbols not found. Is perl in debug mode?");
+	if (get_hv("DB::sub", 0) == NULL) {
+		warn("NYTProf internal error - perl not in debug mode");
+		return 0;
 	}
 
 	/* create file id mapping hash */
@@ -961,7 +975,35 @@ init_profiler(pTHX) {
 	
 	open_output_file(aTHX_ PROF_output_file);
 
-	intercept_opcodes(aTHX);
+	/* redirect opcodes for statement profiling */
+	if (!use_db_sub) {
+		pp_nextstate_orig = PL_ppaddr[OP_NEXTSTATE];
+		PL_ppaddr[OP_NEXTSTATE] = pp_nextstate_profiler;
+		pp_setstate_orig = PL_ppaddr[OP_SETSTATE];
+		PL_ppaddr[OP_SETSTATE] = pp_setstate_profiler;
+		pp_dbstate_orig = PL_ppaddr[OP_DBSTATE];
+		PL_ppaddr[OP_DBSTATE] = pp_dbstate_profiler;
+	}
+
+	/* redirect opcodes for caller tracking */
+	if (!sub_callers_hv)
+		sub_callers_hv = newHV();
+	pp_entersub_orig = PL_ppaddr[OP_ENTERSUB];
+	PL_ppaddr[OP_ENTERSUB] = pp_entersub_profiler;
+
+	if (profile_begin) {
+		enable_profile(aTHX);
+	}
+	else {
+		SV *enable_profile_sv = (SV *)get_cv("DB::enable_profile", GV_ADDWARN);
+		if (trace_level >= 2)
+			warn("enable_profile defered to INIT phase");
+		/* INIT { enable_profile() } */
+		if (!PL_initav)
+			PL_initav = newAV();
+		av_unshift(PL_initav, 1); /* we want to be first */
+		av_store(PL_initav, 0, SvREFCNT_inc(enable_profile_sv));
+	}
 
 	/* END { _finish() } */
 	if (!PL_endav)
@@ -981,6 +1023,7 @@ init_profiler(pTHX) {
 		(*u2time)(aTHX_ start_utime);
 #endif
 	}
+  return 1;
 }
 
 /************************************
@@ -1492,25 +1535,18 @@ set_option(const char *opt, const char *value)
 
 int
 init_profiler()
-	CODE:
-		init_profiler(aTHX);
-		XSRETURN_IV(1);
+	C_ARGS:
+	aTHX
 
-void
-enable_profile(...)
-	PPCODE:
-		IV prev_DBsingle = SvIV(PL_DBsingle);
-		sv_setiv(PL_DBsingle, 1);
-		XSRETURN_IV(prev_DBsingle);
+int
+enable_profile()
+	C_ARGS:
+	aTHX
 
-void
-disable_profile(...)
-	PPCODE:
-		IV prev_DBsingle = SvIV(PL_DBsingle);
-		sv_setiv(PL_DBsingle, 0);
-		if (out)
-			fflush(out);
-		XSRETURN_IV(prev_DBsingle);
+int
+disable_profile()
+	C_ARGS:
+	aTHX
 
 void
 _finish(...)
@@ -1518,8 +1554,7 @@ _finish(...)
 	is_finishing = 1;
 	if (trace_level)
 		warn("_finish (last_pid %d, getpid %d)\n", last_pid, getpid());
-	if (use_db_sub)
-		sv_setiv(PL_DBsingle, 0);
+	disable_profile(aTHX);
 	DB(aTHX); /* write data for final statement */
 	if (out) {
 		write_sub_line_ranges(aTHX_ 0);
@@ -1558,7 +1593,7 @@ load_profile_data_from_file(file=NULL)
 	}
 	RETVAL = load_profile_data_from_stream();
 	fclose(in);
-       
+
 	OUTPUT:
 	RETVAL
 
