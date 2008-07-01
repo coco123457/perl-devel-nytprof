@@ -227,3 +227,9 @@ subs, but those can be detetected and a note added.)
 The whole reporting framework needs a rewrite to use a single 'thin' command
 line and classes for the Model (lines, files, subs), View (html, csv etc),
 and Controller (composing views to form reports).
+
+Add timing to sub calls by using save stack to trigger end of timing measurement?
+
+Add resolution of __ANON__ sub names (eg imported 'constants') where possible.
+
+remove STDOUT/SDTERR support
