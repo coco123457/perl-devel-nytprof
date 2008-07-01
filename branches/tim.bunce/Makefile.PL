@@ -26,6 +26,7 @@ if ($^O eq 'MSWin32') {
 
 # --- Options
 GetOptions(
+	'g!'  => \my $opt_g,
 	'pg!' => \my $opt_pg,
 ) or exit 1;
 
@@ -167,7 +168,7 @@ push @LIBS, "-lrt" if $clock_gettime;
 # the contents of the Makefile that is written.
 my %mm_opts;
 $mm_opts{LICENSE} = 'perl' if $ExtUtils::MakeMaker::VERSION >= 6.3002;
-#$mm_opts{OPTIMIZE} = '-g' if -d '.svn';
+$mm_opts{OPTIMIZE} = '-g'  if $opt_g;
 $mm_opts{CCFLAGS}  = "-pg" if $opt_pg;
 
 WriteMakefile(
