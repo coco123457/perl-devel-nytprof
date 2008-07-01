@@ -74,4 +74,6 @@ t/test30-fork.1.v
 t/test30-fork.1.x
 t/test50-disable.p
 t/test50-disable.x
+t/test60-subname.p
+t/test60-subname.rdt
 test.pl

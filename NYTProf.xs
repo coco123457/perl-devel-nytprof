@@ -861,11 +861,10 @@ reinit_if_forked(pTHX) {
 OP *
 pp_entersub_profiler(pTHX) {
 	OP *op;
-	COP *prev_cop = NULL;
+	COP *prev_cop = PL_curcop;
 	OP *next_op = PL_op->op_next; /* op to execute after sub returns */
-
-	if (cxstack_ix >= 0)	/* dodge wierdness XXX investigate */
-		prev_cop = PL_curcop;
+	dSP;
+	SV *top = *SP;
 
 	/*
 	 * for normal subs pp_entersub enters the sub
@@ -875,27 +874,49 @@ pp_entersub_profiler(pTHX) {
 	 */
 	op = pp_entersub_orig(aTHX);
 
-	/* have entered a sub and we're profiling */
-	if (op != next_op && prev_cop && is_profiling) {
+	if (is_profiling) {
 
 		/* get line, file, and fid for statement *before* the call */
-		char *file = OutCopFILE(PL_curcop);
-		int line = CopLINE(PL_curcop);
+		char *file = OutCopFILE(prev_cop);
+		int line = CopLINE(prev_cop);
 		unsigned int fid = get_file_id(aTHX_ file, strlen(file), 1);
 		char fid_line_key[50];
-
-		/* get name of sub we've just entered */
-		GV *cvgv = CvGV(cxstack[cxstack_ix].blk_sub.cv);
+		int fid_line_key_len = my_snprintf(fid_line_key, sizeof(fid_line_key), "%u:%d", fid, line);
 		SV *subname_sv = newSV(0);
 		SV *sv_tmp;
 
-		int fid_line_key_len = my_snprintf(fid_line_key, sizeof(fid_line_key), "%u:%d", fid, line);
-		if (isGV(cvgv)) {
-			gv_efullname3(subname_sv, cvgv, Nullch);
+		if (op != next_op) { /* have entered a sub */
+
+			/* get name of sub we've just entered */
+			GV *cvgv = CvGV(cxstack[cxstack_ix].blk_sub.cv);
+			if (isGV(cvgv)) {
+				gv_efullname3(subname_sv, cvgv, Nullch);
+			}
+			else {
+				warn("unknown blk_sub.cv '%s'",SvPV_nolen((SV*)cvgv));
+					if (trace_level)
+						sv_dump(cvgv);
+				sv_setpvf(subname_sv, "(unknown sub %s)", SvPV_nolen((SV*)cvgv));
+			}
 		}
-		else {
-			warn("unknown blk_sub.cv '%s'",SvPV_nolen((SV*)cvgv));
-			sv_setpvn(subname_sv, "(unknown)",9);
+		else {	/* returned from an XS function */
+				CV *cv = (isGV(top)) ? GvCV(top) : (CV *)top;
+				if (cv && CvGV(cv)) {
+					/* for a plain call of an imported sub the GV is of the current
+					 * package, so we dig to find the original package
+					 */
+					GV *gv = CvGV(cv);
+					sv_setpvf(subname_sv, "%s::%s", HvNAME(GvSTASH(gv)), GvNAME(gv));
+				}
+				else if (isGV(top)) {
+					gv_efullname3(subname_sv, (GV *)top, Nullch);
+				}
+				else {
+					warn("unknown arg to entersub '%s'",SvPV_nolen(top));
+					if (trace_level)
+						sv_dump(top);
+					sv_setpvf(subname_sv, "(unknown xs %s)", SvPV_nolen(top));
+				}
 		}
 		if (trace_level >= 3)
 			fprintf(stderr, "fid %d:%d called %s (%s)\n", fid, line, 
@@ -909,6 +930,7 @@ pp_entersub_profiler(pTHX) {
 		sv_tmp = *hv_fetch((HV*)SvRV(sv_tmp), fid_line_key, fid_line_key_len, 1);
 		sv_inc(sv_tmp);
 	}
+
 	return op;
 }
 
