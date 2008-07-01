@@ -22,6 +22,8 @@ GetOptions(
     'v|verbose' => \my $opt_verbose,
 ) or exit 1;
 
+my $regex = shift;
+
 my $subs_count = shift || 1000;
 my $loop_count = shift || 1000;
 
@@ -77,6 +79,10 @@ while ( my ($testname, $testinfo) = each %tests ) {
         warn "Can't run $testname profiler - skipped\n";
         next;
     }
+    if ($regex && $testname ne 'baseline' && $testname !~ m/$regex/o) {
+        warn "Skipped $testname\n";
+        next;
+    }
     $testinfo->{testname} = $testname;
     $test_subs{$testname} = sub { run_test($testinfo, $subs_count, $loop_count) };
 }
@@ -89,7 +95,8 @@ printf "Profiler performance using perl %8s %s (%s %s %s)\n",
 
 cmpthese(4, \%test_subs, 'nop');
 
-while ( my ($testname, $testinfo) = each %tests ) {
+for my $testname (sort keys %test_subs) {
+    my $testinfo = $tests{$testname};
     if ($testinfo->{datafile}) {
         printf "%10s: %6.1fKB %s\n",
             $testname, (-s $testinfo->{datafile})/1024, $testinfo->{datafile};
