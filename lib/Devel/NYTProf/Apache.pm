@@ -27,14 +27,14 @@ if (MP2) {
 	require mod_perl2;
 	require Apache2::ServerUtil;
 	my $s = Apache2::ServerUtil->server;
-	$s->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
-	$s->push_handlers(PerlChildExitHandler => \&DB::_finish);
+	$s->push_handlers(PerlChildInitHandler => sub { DB::enable_profile });
+	$s->push_handlers(PerlChildExitHandler => sub { DB::_finish });
 }
 else {
 	require Apache;
 	if (Apache->can('push_handlers')) {
-		Apache->push_handlers(PerlChildInitHandler => \&DB::enable_profile);
-		Apache->push_handlers(PerlChildExitHandler => \&DB::_finish);
+	    Apache->push_handlers(PerlChildInitHandler => sub { DB::enable_profile });
+	    Apache->push_handlers(PerlChildExitHandler => sub { DB::_finish });
 	}
 	else {
 	    Carp::carp("Apache.pm was not loaded");
