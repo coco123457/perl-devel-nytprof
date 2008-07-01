@@ -119,7 +119,8 @@ foreach my $test (@tests) {
 			}
 		}
 		else {
-			warn "Unrecognized extension '$type' on test file '$test'\n";
+			warn "Unrecognized extension '$type' on test file '$test'\n"
+				unless $type eq 'new'; # handy for "test.pl t/test01.*"
 		}
 	}
 }
@@ -299,8 +300,10 @@ sub verify_report {
 		print "\n";
 	}
 
-	is_deeply(\@got, \@expected, $test)
-		or spit_file("$test.new", join("", @got));
+	is_deeply(\@got, \@expected, $test) or do {
+		spit_file("$test.new", join("", @got));
+		diff_files($test, "$test.new");
+	};
 	is(join("\n",@accuracy_errors), '', $test);
 }
 
