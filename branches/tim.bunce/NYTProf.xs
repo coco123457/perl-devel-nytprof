@@ -864,7 +864,7 @@ pp_entersub_profiler(pTHX) {
 	COP *prev_cop = PL_curcop;
 	OP *next_op = PL_op->op_next; /* op to execute after sub returns */
 	dSP;
-	SV *top = *SP;
+	SV *sub_sv = *SP;
 
 	/*
 	 * for normal subs pp_entersub enters the sub
@@ -884,40 +884,34 @@ pp_entersub_profiler(pTHX) {
 		int fid_line_key_len = my_snprintf(fid_line_key, sizeof(fid_line_key), "%u:%d", fid, line);
 		SV *subname_sv = newSV(0);
 		SV *sv_tmp;
+		CV *cv;
 
 		if (op != next_op) { /* have entered a sub */
+			/* use cv of sub we've just entered to get name */
+			sub_sv = (SV *)cxstack[cxstack_ix].blk_sub.cv;
+		}
+		/* else have returned from XS so use sub_sv for name */
 
-			/* get name of sub we've just entered */
-			GV *cvgv = CvGV(cxstack[cxstack_ix].blk_sub.cv);
-			if (isGV(cvgv)) {
-				gv_efullname3(subname_sv, cvgv, Nullch);
-			}
-			else {
-				warn("unknown blk_sub.cv '%s'",SvPV_nolen((SV*)cvgv));
-					if (trace_level)
-						sv_dump(cvgv);
-				sv_setpvf(subname_sv, "(unknown sub %s)", SvPV_nolen((SV*)cvgv));
-			}
+		/* determine the original fully qualified name for sub */
+		cv = (isGV(sub_sv)) ? GvCV(sub_sv) : (CV *)sub_sv;
+		if (cv && CvGV(cv)) {
+			/* for a plain call of an imported sub the GV is of the current
+				* package, so we dig to find the original package
+				*/
+			GV *gv = CvGV(cv);
+			sv_setpvf(subname_sv, "%s::%s", HvNAME(GvSTASH(gv)), GvNAME(gv));
 		}
-		else {	/* returned from an XS function */
-				CV *cv = (isGV(top)) ? GvCV(top) : (CV *)top;
-				if (cv && CvGV(cv)) {
-					/* for a plain call of an imported sub the GV is of the current
-					 * package, so we dig to find the original package
-					 */
-					GV *gv = CvGV(cv);
-					sv_setpvf(subname_sv, "%s::%s", HvNAME(GvSTASH(gv)), GvNAME(gv));
-				}
-				else if (isGV(top)) {
-					gv_efullname3(subname_sv, (GV *)top, Nullch);
-				}
-				else {
-					warn("unknown arg to entersub '%s'",SvPV_nolen(top));
-					if (trace_level)
-						sv_dump(top);
-					sv_setpvf(subname_sv, "(unknown xs %s)", SvPV_nolen(top));
-				}
+		else if (isGV(sub_sv)) {
+			gv_efullname3(subname_sv, (GV *)sub_sv, Nullch);
 		}
+		else {
+			char *what = (op == next_op) ? "xs" : "sub";
+			warn("unknown entersub %s id '%s'", what, SvPV_nolen(sub_sv));
+			if (trace_level)
+				sv_dump(sub_sv);
+			sv_setpvf(subname_sv, "(unknown %s %s)", what, SvPV_nolen(sub_sv));
+		}
+
 		if (trace_level >= 3)
 			fprintf(stderr, "fid %d:%d called %s (%s)\n", fid, line, 
 							SvPV_nolen(subname_sv), OP_NAME(op));
