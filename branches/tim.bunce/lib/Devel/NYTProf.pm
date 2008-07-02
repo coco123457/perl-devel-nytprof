@@ -14,20 +14,18 @@ package Devel::NYTProf;
 package	# hide the package from the PAUSE indexer
 	DB;
 
-	# setting $^P non-zero automatically initializes perl debugging internals
-	# (mg.c calls init_debugger) if $DB::single is false. This is handy for
-	# situations like mod_perl where perl wasn't started with -d flag.
-	# set the flags that influence compilation ASAP so we get full details
+	# Enable specific perl debugger flags.
+	# Set the flags that influence compilation ASAP so we get full details
 	# (sub line ranges etc) of modules loaded as a side effect of loading
 	# Devel::NYTProf::Core (ie XSLoader, strict, Exporter etc.)
 	$^P = 0x010 # record line range of sub definition
 	    | 0x100 # informative "file" names for evals
 	    | 0x200;# informative names for anonymous subroutines
 
-	# only needed if use_db_sub is enabled
 	$^P |=0x002 # line-by-line profiling (if $DB::single true)
 	    | 0x020 # start (after BEGINs) with single-step on
-			if 1;
+			# XXX hack, need better option handling
+			if $ENV{NYTPROF} && $ENV{NYTPROF} =~ m/\buse_db_sub=1\b/;
 
 	require Devel::NYTProf::Core; # loads XS
 
