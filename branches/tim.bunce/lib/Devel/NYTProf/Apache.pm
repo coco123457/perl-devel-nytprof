@@ -1,3 +1,14 @@
+# vim: ts=2 sw=2 sts=0 noexpandtab:
+##########################################################
+# This script is part of the Devel::NYTProf distribution
+#
+# Copyright, contact and other information can be found
+# at the bottom of this file, or by going to:
+# http://search.cpan.org/~akaplan/Devel-NYTProf
+#
+###########################################################
+# $Id$
+###########################################################
 package Devel::NYTProf::Apache;
 
 our $VERSION = 0.01;
@@ -82,7 +93,9 @@ L<Devel::NYTProf>
 
 =head1 AUTHOR
 
-Steve Peters, C<< <steve at fisharerojo.org> >>
+B<Adam Kaplan>, C<< <akaplan at nytimes.com> >>
+B<Tim Bunce>, L<http://www.tim.bunce.name> and L<http://blog.timbunce.org>
+B<Steve Peters>, C<< <steve at fisharerojo.org> >>
 
 =head1 COPYRIGHT AND LICENSE
 

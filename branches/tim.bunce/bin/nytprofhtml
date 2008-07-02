@@ -6,6 +6,8 @@
 ## at the bottom of this file, or by going to:
 ## http://search.cpan.org/~akaplan/Devel-NYTProf
 ##
+##########################################################
+# $Id$
 ###########################################################
 use warnings;
 use strict;

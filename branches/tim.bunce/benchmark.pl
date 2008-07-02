@@ -8,7 +8,7 @@
 ## http://search.cpan.org/perldoc?Devel::NYTProf
 ##
 ###########################################################
-## $Id: test.pl 157 2008-06-23 02:56:43Z steve.peters $
+## $Id$
 ###########################################################
 use warnings;
 use strict;
