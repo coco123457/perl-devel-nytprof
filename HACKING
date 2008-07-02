@@ -251,8 +251,6 @@ Rename Foo::BEGIN subs to Foo::BEGIN[file:line]
 
 Refactor this HACKING file!
 
-remove STDOUT/SDTERR support
-
 Add docs for new options
 
 Add docs for use_db_sub and explain pros & cons. Especially that opcode

@@ -80,12 +80,12 @@ static Hash_table hashtable = { NULL, MAX_HASH_SIZE, NULL, NULL };
 /* defaults */
 static FILE* out;
 static FILE* in;
-static bool usecputime = 0;
-static bool profile_blocks = 0;
 
 /* options and overrides */
 static char PROF_output_file[MAXPATHLEN+1] = "nytprof.out";
 static bool embed_fid_line = 0;
+static bool usecputime = 0;
+static bool profile_blocks = 0;
 static int use_db_sub = 0;
 static int profile_begin = 0;
 static int trace_level = 0;
@@ -99,7 +99,7 @@ static int (*u2time)(pTHX_ UV *) = 0;
 static UV start_utime[2], end_utime[2];
 #endif
 static unsigned int last_executed_line;
-static unsigned int last_executed_file;
+static unsigned int last_executed_fid;
 static unsigned int last_block_line;
 static unsigned int last_sub_line;
 static unsigned int is_profiling;
@@ -360,15 +360,15 @@ get_file_id(pTHX_ char* file_name, STRLEN file_name_len, int create_new) {
 		emit_fid(found);
 
 		if (trace_level) {
-			/* including last_executed_file can be handy for tracking down how
+			/* including last_executed_fid can be handy for tracking down how
 			 * a file got loaded */
 			if (found->eval_fid)
 				warn("New fid %2u (after %2u:%-4u): %.*s (eval fid %u line %u)\n",
-					found->id, last_executed_file, last_executed_line,
+					found->id, last_executed_fid, last_executed_line,
 					found->key_len, found->key, found->eval_fid, found->eval_line_num);
 		  else
 				warn("New fid %2u (after %2u:%-4u): %.*s %s\n",
-					found->id, last_executed_file, last_executed_line,
+					found->id, last_executed_fid, last_executed_line,
 					found->key_len, found->key, (found->key_abs) ? found->key_abs : "");
 		}
 	}
@@ -693,19 +693,19 @@ DB(pTHX) {
 	if (!is_profiling)
 		return;
 
-	if (last_executed_file) {
+	if (last_executed_fid) {
 		reinit_if_forked(aTHX);
 
 		fputc( (profile_blocks) ? '*' : '+', out);
 		output_int(elapsed);
-		output_int(last_executed_file);
+		output_int(last_executed_fid);
 		output_int(last_executed_line);
-    if (profile_blocks) {
+		if (profile_blocks) {
 			output_int(last_block_line);
 			output_int(last_sub_line);
 		}
 		if (trace_level >= 3)
-			warn("Wrote %d:%-4d %2u ticks (%u, %u)\n", last_executed_file, 
+			warn("Wrote %d:%-4d %2u ticks (%u, %u)\n", last_executed_fid, 
 						last_executed_line, elapsed, last_block_line, last_sub_line);
 
 	}
@@ -728,16 +728,16 @@ DB(pTHX) {
 	}
 
 	file = OutCopFILE(cop);
-	if (!last_executed_file) {	/* first time */
+	if (!last_executed_fid) {	/* first time */
 		if (trace_level >= 1) {
 			warn("NYTProf pid %d: first statement line %d of %s",
 				getpid(), CopLINE(cop), OutCopFILE(cop));
 		}
 	}
-	last_executed_file = get_file_id(aTHX_ file, strlen(file), 1);
+	last_executed_fid = get_file_id(aTHX_ file, strlen(file), 1);
 
 	if (trace_level >= 4)
-		warn("     @%d:%-4d %s", last_executed_file, last_executed_line,
+		warn("     @%d:%-4d %s", last_executed_fid, last_executed_line,
 			(profile_blocks) ? "looking for block and sub lines" : "");
 
   if (profile_blocks) {
@@ -804,37 +804,20 @@ void
 open_output_file(pTHX_ char *filename) {
 
   char filename_buf[MAXPATHLEN];
-	const char *mode = "wb";
-	int fd = -2;
 
 	if (out) {	/* already opened so assume forking */
 		sprintf(filename_buf, "%s.%d", filename, getpid());
 		filename = filename_buf;
-	}
-	else if (strEQ(filename, "STDOUT")) {
-		fd = dup(STDOUT_FILENO);
-	}
-	else if (strEQ(filename, "STDERR")) {
-		fd = dup(STDERR_FILENO);
+		/* caller is expected to have purged/closed old out if appropriate */
 	}
 
-	if (-1 == fd) {
-		if (out) {
-			/* caller is expected to have purged old out if appropriate */
-			out = NULL;
-		}
-	}
-  else {
-		if (trace_level)
-				warn("Opening %s (%s)\n", filename, mode);
-
-		out = (filename) ? fopen(filename, mode) : fdopen(fd, mode);
-	}
-
-	if (!out) {	/* failed to open */
+	out = fopen(filename, "wb");
+	if (!out) {
 		disable_profile(aTHX);
 		croak("Failed to open output '%s': %s", filename, strerror(errno));
 	}
+	if (trace_level)
+			warn("Opened %s\n", filename);
 
 	print_header(aTHX);
 }
@@ -1613,15 +1596,7 @@ load_profile_data_from_file(file=NULL)
 
 	if (trace_level)
 		warn("reading profile data from file %s\n", file);
-	if (strEQ(file,"STDIN")) {
-		int fd = dup(STDIN_FILENO);
-		if (-1 == fd)
-			croak("Unable to dup stdin: %s", strerror(errno));
-		in = fdopen(fd, "r");
-	}
-	else {
-		in = fopen(file, "rb");
-	}
+	in = fopen(file, "rb");
 	if (in == NULL) {
 		croak("Failed to open input '%s': %s", file, strerror(errno));
 	}
