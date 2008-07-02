@@ -50,6 +50,7 @@ t/test10.v
 t/test10.x
 t/test11.p
 t/test11.v
+t/test11.rdt
 t/test11.x
 t/test12.p
 t/test12.pl
@@ -62,7 +63,6 @@ t/test14.p
 t/test14.pm
 t/test14.pm.x
 t/test14.rdt
-t/test14.v
 t/test14.x
 t/test15.p
 t/test15.v
