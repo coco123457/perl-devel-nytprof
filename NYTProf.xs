@@ -100,6 +100,7 @@ static UV start_utime[2], end_utime[2];
 #endif
 static unsigned int last_executed_line;
 static unsigned int last_executed_fid;
+static        char *last_executed_fileptr;
 static unsigned int last_block_line;
 static unsigned int last_sub_line;
 static unsigned int is_profiling;
@@ -734,13 +735,16 @@ DB(pTHX) {
 				getpid(), CopLINE(cop), OutCopFILE(cop));
 		}
 	}
-	last_executed_fid = get_file_id(aTHX_ file, strlen(file), 1);
+	if (file != last_executed_fileptr) {
+		last_executed_fileptr = file;
+		last_executed_fid = get_file_id(aTHX_ file, strlen(file), 1);
+	}
 
 	if (trace_level >= 4)
 		warn("     @%d:%-4d %s", last_executed_fid, last_executed_line,
 			(profile_blocks) ? "looking for block and sub lines" : "");
 
-  if (profile_blocks) {
+	if (profile_blocks) {
 		last_block_line = 0;
 		last_sub_line   = 0;
 		visit_contexts(aTHX_ ~0, &_check_context);
@@ -830,6 +834,7 @@ reinit_if_forked(pTHX) {
 	if (trace_level >= 1)
 		warn("New pid %d (was %d)\n", getpid(), last_pid);
 	last_pid = getpid();
+	last_executed_fileptr = NULL;
 	FPURGE(out);
   /* we don't bother closing the current out fh so if we don't have fpurge
 	* any old pending data that was duplicated by the fork won't be written
@@ -947,6 +952,7 @@ enable_profile(pTHX)
 	if (trace_level)
 		warn("NYTProf enable_profile%s", (prev_is_profiling)?" (already enabled)":"");
 	is_profiling = 1;
+	last_executed_fileptr = NULL;
 	if (use_db_sub)
 		sv_setiv(PL_DBsingle, 1);
 	return prev_is_profiling;
@@ -1544,7 +1550,7 @@ DB(...)
 		PERL_UNUSED_VAR(items);
 		if (use_db_sub)
 			DB(aTHX);
-	  else if (trace_level)
+	  else if (1||trace_level)
 			warn("DB called needlessly");
 
 void
