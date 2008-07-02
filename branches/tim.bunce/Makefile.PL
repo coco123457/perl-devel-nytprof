@@ -228,7 +228,6 @@ sub dynamic {
 		"\t".'$(NOECHO) $(MKPATH) $(XSL_DEST_DIR)',
 		"\t".'$(CP) $(INST_DYNAMIC) $(XSL_DEST)',
 		'';
-	warn $make;
 	return $make;
 }
 

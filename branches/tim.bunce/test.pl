@@ -224,7 +224,9 @@ sub dump_profile_to_file {
 
 sub diff_files {
 	# we don't care if this fails, it's just an aid to debug test failures
-	system("diff", "-u", @_);
+	my @opts = split / /, $ENV{NYTPROF_DIFF_OPTS}||''; # e.g. '-y'
+	@opts = ('-u') unless @opts;
+	system("diff", @opts, @_);
 }
 
 

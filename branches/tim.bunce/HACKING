@@ -246,6 +246,19 @@ Rename output directory to nytprof?
 Only warn "No file line range data for sub' once per sub.
 Add hint that it may be XS.
 
+Rename Foo::BEGIN subs to Foo::BEGIN[file:line]
+(which matches the style used for Foo::__AUTO__[file:line])
+
 Refactor this HACKING file!
 
 remove STDOUT/SDTERR support
+
+Add docs for new options
+
+Add docs for use_db_sub and explain pros & cons. Especially that opcode
+redirection can't profile code that was loaded before NYTProf because
+it only affects code that is *compiled* after it takes effect.
+(Unless we want to traverse the existing compiled code and edit the ops in place :-)
+
+Would be good if DB::DB sub wasn't defined when use_db_sub is false
+so the profiler could be used to profile debuggers etc.
