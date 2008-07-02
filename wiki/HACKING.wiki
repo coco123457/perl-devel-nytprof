@@ -1,7 +1,5 @@
-#summary Instructions for hacking this module.
+#summary Instructions for hacking Devel::NYTProf.
 #labels Phase-Implementation,Phase-QA,Featured
-
-= HACKING =
 
 Please read the latest HACKING file from svn [http://perl-devel-nytprof.googlecode.com/svn/trunk/HACKING over here].
 
