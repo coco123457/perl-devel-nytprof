@@ -857,7 +857,7 @@ reinit_if_forked(pTHX) {
 OP *
 pp_entersub_profiler(pTHX) {
 	OP *op;
-	COP *prev_cop = PL_curcop;
+	COP *prev_cop = PL_curcop_nytprof;
 	OP *next_op = PL_op->op_next; /* op to execute after sub returns */
 	dSP;
 	SV *sub_sv = *SP;
@@ -873,9 +873,16 @@ pp_entersub_profiler(pTHX) {
 	if (is_profiling) {
 
 		/* get line, file, and fid for statement *before* the call */
+
 		char *file = OutCopFILE(prev_cop);
+		unsigned int fid = (file == last_executed_fileptr)
+			? last_executed_fid
+			: get_file_id(aTHX_ file, strlen(file), 1);
+		/* XXX could use same closest_cop as DB() but it doesn't seem
+		 * to be needed here. Line is 0 only when call is from embedded
+		 * C code like mod_perl (at least in my testing so far)
+		 */
 		int line = CopLINE(prev_cop);
-		unsigned int fid = get_file_id(aTHX_ file, strlen(file), 1);
 		char fid_line_key[50];
 		int fid_line_key_len = my_snprintf(fid_line_key, sizeof(fid_line_key), "%u:%d", fid, line);
 		SV *subname_sv = newSV(0);
