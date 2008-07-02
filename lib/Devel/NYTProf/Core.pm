@@ -1,6 +1,16 @@
+# vim: ts=2 sw=2 sts=0 noexpandtab:
+##########################################################
+# This script is part of the Devel::NYTProf distribution
+#
+# Copyright, contact and other information can be found
+# at the bottom of this file, or by going to:
+# http://search.cpan.org/~akaplan/Devel-NYTProf
+#
+###########################################################
+# $Id$
+###########################################################
 package Devel::NYTProf::Core;
 
-# $Id$
 
 use XSLoader;
 
@@ -30,9 +40,9 @@ See L<Devel::NYTProf> and L<Devel::NYTProf::Reader>.
 
 =head1 AUTHOR
 
-Adam Kaplan, akaplan at nytimes dotcom.
-
-Tim Bunce, L<http://www.tim.bunce.name> and L<http://blog.timbunce.org>
+B<Adam Kaplan>, C<< <akaplan at nytimes.com> >>
+B<Tim Bunce>, L<http://www.tim.bunce.name> and L<http://blog.timbunce.org>
+B<Steve Peters>, C<< <steve at fisharerojo.org> >>
 
 =head1 COPYRIGHT AND LICENSE
 

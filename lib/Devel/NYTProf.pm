@@ -92,7 +92,7 @@ by The New York Times Co. to help our developers quickly identify bottlenecks in
 large Perl applications.  The NY Times loves Perl and we hope the community will benefit from our work as much as we have from theirs.
 
 Please visit L<http://open.nytimes.com>, our open source blog to see what we are up to, L<http://code.nytimes.com> to see some of our open projects and then 
-check out L<htt://nytimes.com> for the latest news!
+check out L<http://nytimes.com> for the latest news!
 
 =head1 DESCRIPTION
  
@@ -201,7 +201,9 @@ might want to check this out if you plan to implement a custom report. Its easy!
 
 =head1 AUTHOR
 
-B<Adam Kaplan>, akaplan at nytimes dotcom
+B<Adam Kaplan>, C<< <akaplan at nytimes.com> >>
+B<Tim Bunce>, L<http://www.tim.bunce.name> and L<http://blog.timbunce.org>
+B<Steve Peters>, C<< <steve at fisharerojo.org> >>
 
 =head1 COPYRIGHT AND LICENSE
 

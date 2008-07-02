@@ -4,6 +4,12 @@
  * Copyright 2008 Adam J. Kaplan, The New York Times Company.
  * Released under the same terms as Perl 5.8
  * See http://search.cpan.org/~akaplan/Devel-NYTProf for more information
+ *
+ * Contributors:
+ * Adam Kaplan, akaplan at nytimes.com
+ * Tim Bunce, http://www.tim.bunce.name and http://blog.timbunce.org
+ * Steve Peters, steve at fisharerojo.org
+ *
  * ************************************************************************
  * $Id$
  * ************************************************************************
