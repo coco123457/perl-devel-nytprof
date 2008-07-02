@@ -17,6 +17,7 @@ use Carp;
 use Config;
 use Getopt::Long;
 use Benchmark qw(:hireswallclock timethese cmpthese);
+use Devel::NYTProf::Data; # just to print path
 
 GetOptions(
     'v|verbose' => \my $opt_verbose,
@@ -62,25 +63,31 @@ my %tests = (
         perlargs => '-MDevel::Profit',
         datafile => 'profit.out',
     },
-    nytprof => {
+    nytprof_o => {
+        env => [ NYTPROF => 'use_db_sub=0:file=nytprof_o.out' ],
         perlargs => '-d:NYTProf',
-        datafile => 'nytprof.out',
+        datafile => 'nytprof_o.out',
     },
-    nytprof_b => {
-        env => [ NYTPROF => 'blocks:file=nytprof_b.out' ],
+    nytprof_s => {
+        env => [ NYTPROF => 'use_db_sub=1:file=nytprof_s.out' ],
         perlargs => '-d:NYTProf',
-        datafile => 'nytprof_b.out',
+        datafile => 'nytprof_s.out',
+    },
+    nytprof_ob => {
+        env => [ NYTPROF => 'blocks:file=nytprof_ob.out' ],
+        perlargs => '-d:NYTProf',
+        datafile => 'nytprof_ob.out',
     },
 );
 
 my %test_subs;
 while ( my ($testname, $testinfo) = each %tests ) {
-    if (!run_test($testinfo, 1, 1)) {
-        warn "Can't run $testname profiler - skipped\n";
-        next;
-    }
     if ($regex && $testname ne 'baseline' && $testname !~ m/$regex/o) {
         warn "Skipped $testname\n";
+        next;
+    }
+    if (!run_test($testinfo, 1, 1)) {
+        warn "Can't run $testname profiler - skipped\n";
         next;
     }
     $testinfo->{testname} = $testname;
@@ -92,6 +99,7 @@ printf "Profiler performance using perl %8s %s (%s %s %s)\n",
     $Config{gccversion} ? 'gcc' : $Config{cc},
     (split / /, $Config{gccversion}||$Config{ccversion}||'')[0]||'',
     $Config{optimize};
+printf "NYTProf is $INC{'Devel/NYTProf/Data.pm'}\n";
 
 cmpthese(4, \%test_subs, 'nop');
 
