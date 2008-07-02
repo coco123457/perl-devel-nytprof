@@ -163,7 +163,6 @@ Write, clean-up documentation
 
 Ability to run bin/nytprof* in perl -d (debugger mode)
 
-(tim.bunce)
 Currently the cost of calling the sub goes to the caller (good)
 but the cost of copying the result goes to the method (poor).
 Overriding pp_leavesub may allow more accurate measurements by avoiding return
@@ -174,6 +173,7 @@ for by the last statement executed each time round the loop.
 Overriding relevant ops may enable better accounting.
 
 Add way for program being profiled to switch output to a new profile file.
+Perhaps via enable_profile($optional_new_filename)
 See http://search.cpan.org/dist/Devel-Profile/ for use case.
 
 Add @INC to data file so reports can be made more readable by removing
@@ -216,9 +216,6 @@ Remove bottom stats.
 
 Use clock_gettime(CLOCK_MONOTONIC) if available, else clock_gettime(CLOCK_REALTIME).
 Those calls are cheaper than gettimeofday and can give nanosecond resolution.
-
-Use opcode redirection instead of DB::DB to measure statements as that avoids the
-cost of a sub call per statement. In progress now.
 
 nytprofhtml: output list of subs as a table and include timings aggregated from
 the line ranges. (Won't be accurate for overlapping subs, such as anonymous
