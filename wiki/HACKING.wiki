@@ -3,6 +3,6 @@
 
 = HACKING =
 
-Please read the latest HACKING file from svn [http://code.google.com/p/perl-devel-nytprof/source/browse/trunk/HACKING over here].
+Please read the latest HACKING file from svn [http://perl-devel-nytprof.googlecode.com/svn/trunk/HACKING over here].
 
 You will find general information about obtaining, compiling and contributing to Devel::NYTProf.  It also contains a list of outstanding bugs and wishlist items.
