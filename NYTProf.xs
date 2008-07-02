@@ -86,7 +86,7 @@ static bool profile_blocks = 0;
 /* options and overrides */
 static char PROF_output_file[MAXPATHLEN+1] = "nytprof.out";
 static bool embed_fid_line = 0;
-static int use_db_sub = 1;
+static int use_db_sub = 0;
 static int profile_begin = 0;
 static int trace_level = 0;
 
@@ -688,6 +688,9 @@ DB(pTHX) {
 	}
 
 	if (!out)
+		return;
+
+	if (!is_profiling)
 		return;
 
 	if (last_executed_file) {
@@ -1558,7 +1561,8 @@ DB(...)
 		PERL_UNUSED_VAR(items);
 		if (use_db_sub)
 			DB(aTHX);
-	  else if (0) warn("DB called");
+	  else if (trace_level)
+			warn("DB called needlessly");
 
 void
 set_option(const char *opt, const char *value)
@@ -1584,8 +1588,8 @@ _finish(...)
 	is_finishing = 1;
 	if (trace_level)
 		warn("_finish (last_pid %d, getpid %d)\n", last_pid, getpid());
-	disable_profile(aTHX);
 	DB(aTHX); /* write data for final statement */
+	disable_profile(aTHX);
 	if (out) {
 		write_sub_line_ranges(aTHX_ 0);
 		write_sub_callers(aTHX);
