@@ -25,7 +25,7 @@ GetOptions(
 
 my $regex = shift;
 
-my $subs_count = shift || 1000;
+my $subs_count = shift || 2000;
 my $loop_count = shift || 1000;
 
 # simple benchmark script to measure profiling overhead
@@ -106,7 +106,7 @@ cmpthese(4, \%test_subs, 'nop');
 for my $testname (sort keys %test_subs) {
     my $testinfo = $tests{$testname};
     if ($testinfo->{datafile}) {
-        printf "%10s: %6.1fKB %s\n",
+        printf "%10s: %6dKB %s\n",
             $testname, (-s $testinfo->{datafile})/1024, $testinfo->{datafile};
         unlink $testinfo->{datafile};
     }

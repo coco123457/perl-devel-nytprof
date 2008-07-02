@@ -708,7 +708,6 @@ DB(pTHX) {
 		if (trace_level >= 3)
 			warn("Wrote %d:%-4d %2u ticks (%u, %u)\n", last_executed_fid, 
 						last_executed_line, elapsed, last_block_line, last_sub_line);
-
 	}
 
 	cop = PL_curcop_nytprof;
