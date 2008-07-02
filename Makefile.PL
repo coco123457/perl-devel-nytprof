@@ -193,8 +193,12 @@ WriteMakefile(
 );
 
 
+# --- MakeMaker overrides ---
+
+package MY;
+
 # add some extra utility targets to the make file
-sub MY::post_constants {
+sub post_constants {
     q{
 svnmanifest::
 	svn list -R .@HEAD | sort | grep -v '/$$' > MANIFEST
@@ -210,6 +214,22 @@ checkpod:
 	find . -type f \( -name .svn -prune -o -name \*.pm -o -name \*.PL -o -name \*.pl \) \
 			-exec podchecker {} \; 2>&1 | grep -v "pod syntax OK"
 }
+}
+
+sub dynamic {
+	my $make = shift->SUPER::dynamic(@_);
+	$make .= join "\n",
+		'# Copy extension to where XSLoader looks to avoid fallback to DynaLoader',
+		'# See t/test14.p for more details',
+		'XSL_DEST_DIR = $(INST_LIB)/$(PARENT_NAME)/auto/$(FULLEXT)',
+		'XSL_DEST = $(XSL_DEST_DIR)/$(DLBASE).$(DLEXT)',
+		'',
+		'dynamic :: $(INST_DYNAMIC)',
+		"\t".'$(NOECHO) $(MKPATH) $(XSL_DEST_DIR)',
+		"\t".'$(CP) $(INST_DYNAMIC) $(XSL_DEST)',
+		'';
+	warn $make;
+	return $make;
 }
 
 
