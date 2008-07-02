@@ -45,7 +45,7 @@ $| = 1;
 
 my $opt_perl = $opts{p};
 my $opt_include = $opts{I};
-my $outdir = 'profiler';
+my $outdir = 'nytprof';
 my $profile_datafile = 'nytprof_t.out';
 
 chdir( 't' ) if -d 't';

@@ -241,8 +241,6 @@ Explain what's shown in html reports, ie say it's elapsed realtime.
 
 Use 'Statements' or 'Stmts' instead of Calls in reports.
 
-Rename output directory to nytprof?
-
 Only warn "No file line range data for sub' once per sub.
 Add hint that it may be XS.
 

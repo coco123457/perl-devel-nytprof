@@ -19,7 +19,7 @@ use constant NUMERIC_PRECISION    => 5;
 
 my %opt = (
     file    => 'nytprof.out',
-    out	    => 'profiler',
+    out	    => 'nytprof',
 );
 GetOptions(\%opt,
     qw/file|f=s delete|d out|o=s help|h/
