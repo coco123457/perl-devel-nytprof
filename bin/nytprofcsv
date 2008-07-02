@@ -78,7 +78,7 @@ sub usage {
 usage: [perl] nytprofcsv [opts]
  --file <file>, -f <file>  Use the specified file as Devel::NYTProf database
                             file. [default: ./nytprof.out]
- --out <dir>,   -o <dir>   Place generated files here [default: ./profiler]
+ --out <dir>,   -o <dir>   Place generated files here [default: ./nytprof]
  --delete,      -d         Delete the old fprofhtml output [uses --out]
  --help,        -h         Print this message
 
@@ -134,7 +134,7 @@ output of L<fprofpp>. Default: nytprof.out
 
 =item -o, --out <dir>
 
-Where to place the generated report. Default: ./profiler/
+Where to place the generated report. Default: ./nytprof/
 
 =item -d, --delete
 
