@@ -1,0 +1,39 @@
+# vim: ts=2 sw=2 sts=0 noexpandtab:
+# $Id$
+
+Devel-NYTProf
+=============
+
+Devel::NYTProf is a powerful feature-rich perl source code profiler.
+
+Devel::NYTProf was written and tested on Linux, Solaris and OS X.
+Please report any problems you encounter on other platforms.
+(Except for windows as we can't help you, but we'd love someone to port it for us.)
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+Some eval tests may fail on perl 5.6.x. It is safe for 'force install' and
+ignore this.
+
+CONTRIBUTING & PUBLIC SVN
+
+See the HACKING file.
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2008 Adam J. Kaplan, NYTimes.com, akaplan aat nytimes dotcom.
+Copyright (C) 2008 The New York Times Company.
+Copyright (C) 2008 Tim Bunce, Ireland.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.8 or,
+at your option, any later version of Perl 5 you may have available.
+
+
