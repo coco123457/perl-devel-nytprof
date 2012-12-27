@@ -1,4 +1,4 @@
 #summary Devel::NYTProf README File
-#labels Featured,Phase-Deploy
+#labels Deprecated,Phase-Deploy
 
 The [http://perl-devel-nytprof.googlecode.com/svn-history/r203/trunk/README current README file] contains general information about what Devel::NYTProf is and how it works.
