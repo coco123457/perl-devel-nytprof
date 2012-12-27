@@ -1,5 +1,5 @@
 #summary Instructions for hacking Devel::NYTProf.
-#labels Phase-Implementation,Phase-QA,Featured
+#labels Phase-Implementation,Phase-QA,Deprecated
 
 Please read the latest HACKING file from svn [http://perl-devel-nytprof.googlecode.com/svn/trunk/HACKING over here].
 
